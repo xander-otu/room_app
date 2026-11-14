@@ -1,0 +1,167 @@
+# ---------------------------------------------------------
+# main.py: the FastAPI app. Holds the Pydantic models
+# (shapes of data going in/out) and the routes (the "doors").
+# ---------------------------------------------------------
+
+# --- Imports ---
+from typing import Literal                            # Literal: allow ONLY specific exact values
+from fastapi import FastAPI, Depends, HTTPException   # FastAPI: the app; Depends: ask for a helper (get_db); HTTPException: send errors like 404
+from pydantic import BaseModel, Field                 # BaseModel: parent of Pydantic models; Field: adds rules (gt=0, ge=0)
+from sqlalchemy.orm import Session                    # the type of `db`, so VS Code knows what it is
+from database import get_db                           # the gatekeeper: hands each request its own session
+from models import Item, Settings                               # the database table class for items
+from sqlalchemy import select                         # select: builds a "fetch rows" query
+
+
+# Create the app. Every route below is attached to this object.
+app = FastAPI()
+
+
+# --- Pydantic models: the shapes of data going IN and OUT ---
+
+# ItemCreate: the "order form" a visitor sends to add an item.
+# Pydantic checks it at the door; bad input gets a 422 before our code runs.
+class ItemCreate(BaseModel):
+    name: str                                                        # required text
+    width_cm: int | None = None                                      # optional; None = "not given"
+    depth_cm: int | None = None                                      # optional
+    height_cm: int | None = None                                     # optional
+    price: int = Field(gt=0)                                         # whole naira, must be above 0
+    priority: Literal["high", "medium", "low"]                       # only these three words allowed
+    monthly_price_increase_pct: float = Field(default=0.0, ge=0)     # 0 or more; defaults to 0
+
+
+# ItemOut: the "delivery note" we send back.
+# Inherits every ItemCreate field, plus id and status (filled in by the database).
+class ItemOut(ItemCreate):
+    id: int
+    status: str
+
+    model_config = {"from_attributes": True}   # lets Pydantic read a SQLAlchemy object (item.name) instead of a dict
+
+# ItemUpdate: the "change form". Every field optional: send only what changed.
+class ItemUpdate(BaseModel):
+    name: str | None = None
+    price: int | None = Field(default=None, gt=0)
+    priority: Literal["high", "medium", "low"] | None = None
+    status: Literal["wanted", "saving", "bought"] | None = None   # status CAN change here
+    width_cm: int | None = None
+    depth_cm: int | None = None
+    height_cm: int | None = None
+    monthly_price_increase_pct: float | None = Field(default=None, ge=0)
+
+# SettingsOut: the savings numbers we send back.
+class SettingsOut(BaseModel):
+    saved_so_far: int
+    monthly_savings: int
+
+    model_config = {"from_attributes": True}   # lets Pydantic read a SQLAlchemy object (settings.saved_so_far) instead of a dict
+
+# SettingsUpdate: the change form for savings. Both optional; ge=0 = no negative naira.
+class SettingsUpdate(BaseModel):
+    saved_so_far: int | None = Field(default=None, ge=0)
+    monthly_savings: int | None = Field(default=None, ge=0)
+
+
+
+# --- Helpers (NOT routes: no @app above them, so FastAPI never calls them) ---
+
+# get_settings: "get or create" the single settings row.
+# Both settings routes call this, so the logic lives in ONE place.
+# Takes db as a plain input (no Depends): the route already has a session and passes it in.
+# -> Settings is a label: "this function hands back a Settings object".
+def get_settings(db: Session) -> Settings:
+    settings = db.get(Settings, 1)  # look in locker 1 (there's only ever one settings row)
+    if settings is None:            # first time ever: no row yet (NOT an error, so no 404)
+        settings = Settings(id=1)   # make a blank row; 0 and 0 come from the defaults in models.py
+        db.add(settings)            # new object → needs add()
+        db.commit()                 # save it
+        db.refresh(settings)        # re-read so the 0s are filled in
+    return settings                 # outside the if: runs every time, old row or new one
+
+# --- Routes ---
+
+# Health check: visit / to confirm the server is alive.
+@app.get("/")
+def greeting():
+    return {"message": "Welcome to the Room Fund API!"}
+
+
+# Add a new item. 201 = "Created", the standard reply when something new is made.
+@app.post("/items", response_model=ItemOut, status_code=201)
+def create_item(item_in: ItemCreate, db: Session = Depends(get_db)):
+    # Build a database row (an Item object) from the checked form.
+    # model_dump() turns the form into a dict: {"name": "Rug", "price": 40000, ...}
+    # ** unpacks that dict into named arguments: Item(name="Rug", price=40000, ...)
+    # Works because the form's field names match the table's column names exactly.
+    db_item = Item(**item_in.model_dump())
+    db.add(db_item)        # put it in the cart (not saved yet)
+    db.commit()            # pay at the counter: now it's saved in roomfund.db
+    db.refresh(db_item)    # re-read the row so db_item gets its new id and status
+    return db_item         # response_model=ItemOut turns the object into JSON
+
+# List every item. list[ItemOut] = "send back a list of delivery notes".
+@app.get("/items", response_model=list[ItemOut])
+def display_items(db: Session = Depends(get_db)):
+    # select(Item) = "SELECT * FROM items"; .scalars() unwraps rows into Item objects; .all() collects them in a list
+    items = db.execute(select(Item)).scalars().all()
+    return items
+
+
+# Get ONE item by its id (taken from the address, e.g. /items/3).
+@app.get("/items/{item_id}", response_model=ItemOut)
+def display_item(item_id: int, db: Session = Depends(get_db)):
+    item = db.get(Item, item_id)    # go straight to that id's "locker"; None if it doesn't exist
+    if item is None:                # check FIRST: missing item → clear 404 instead of a 500 crash
+        raise HTTPException(status_code=404, detail="Item not found")
+    return item                     # only reached when the item exists
+
+# Update an item. Send ONLY what changed, e.g. {"price": 230000}.
+@app.put("/items/{item_id}", response_model=ItemOut)
+def edit_item(item_id: int, item_in: ItemUpdate, db: Session = Depends(get_db)):
+    item = db.get(Item, item_id)    # find it in its "locker"
+    if item is None:                # missing → 404
+        raise HTTPException(status_code=404, detail="Item not found")
+
+    # exclude_unset=True: keep ONLY the fields the visitor actually sent,
+    # so the fields they left out aren't wiped to None.
+    changes = item_in.model_dump(exclude_unset=True)   # e.g. {"price": 230000}
+
+    # Take each (label, value) pair and write it into the matching box.
+    # setattr(item, "price", 230000) is the same as item.price = 230000,
+    # but works when the box name is stored in a variable.
+    for field, value in changes.items():
+        setattr(item, field, value)
+
+    db.commit()            # save. No db.add(): the session is already watching this item
+    db.refresh(item)       # re-read so we return exactly what's saved
+    return item
+
+
+# Delete an item. 204 = "done, nothing to send back".
+@app.delete("/items/{item_id}", status_code=204)
+def delete_item(item_id: int, db: Session = Depends(get_db)):
+    item = db.get(Item, item_id)    # find it
+    if item is None:                # missing → 404
+        raise HTTPException(status_code=404, detail="Item not found")
+    db.delete(item)                 # put "remove this" in the cart
+    db.commit()                     # pay: now it's gone from roomfund.db
+                                    # no return: a 204 sends an empty reply
+
+# See your savings numbers. No id in the address: there's only one settings row.
+@app.get("/settings", response_model=SettingsOut)
+def get_settings_route(db: Session = Depends(get_db)):
+    current_setting = get_settings(db)   # the helper finds the row (or makes it with 0, 0)
+    return current_setting               # whatever the row holds RIGHT NOW
+
+
+# Change your savings numbers. Send only what changed, e.g. {"monthly_savings": 60000}.
+@app.put("/settings", response_model=SettingsOut)
+def update_settings(settings_in: SettingsUpdate, db: Session = Depends(get_db)):
+    settings = get_settings(db)          # no 404 check needed: the helper always returns a row
+    changes = settings_in.model_dump(exclude_unset=True)   # only the fields actually sent
+    for field, element in changes.items():
+        setattr(settings, field, element)                  # settings.<field> = element
+    db.commit()                          # save (no add(): the session already watches this row)
+    db.refresh(settings)                 # re-read so we return exactly what's saved
+    return settings

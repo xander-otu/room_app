@@ -1,0 +1,15 @@
+# Virtual environments (rebuild with pip install)
+.venv/
+venv/
+
+# Python's temporary files
+__pycache__/
+
+# The database: data, not code (and private)
+*.db
+
+# Secrets: never commit these
+.env
+
+# Claude Code's local settings for this machine
+.claude/settings.local.json
