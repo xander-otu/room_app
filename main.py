@@ -9,7 +9,7 @@ from fastapi import FastAPI, Depends, HTTPException   # FastAPI: the app; Depend
 from pydantic import BaseModel, Field                 # BaseModel: parent of Pydantic models; Field: adds rules (gt=0, ge=0)
 from sqlalchemy.orm import Session                    # the type of `db`, so VS Code knows what it is
 from database import get_db                           # the gatekeeper: hands each request its own session
-from models import Item, Settings                               # the database table class for items
+from models import Item, Settings                     # the database table classes
 from sqlalchemy import select                         # select: builds a "fetch rows" query
 
 
@@ -79,6 +79,17 @@ def get_settings(db: Session) -> Settings:
         db.refresh(settings)        # re-read so the 0s are filled in
     return settings                 # outside the if: runs every time, old row or new one
 
+# get_items: find ONE item by id, or stop with a 404.
+# Used by GET one, PUT and DELETE, so the "find + 404" lines live in ONE place.
+# The raise doesn't just stop this helper: it stops the ROUTE that called it too,
+# and FastAPI turns it into the 404 reply. So routes don't need their own check.
+def get_items(item_id: int, db: Session) -> Item:
+    item = db.get(Item, item_id)    # find it in its "locker"
+    if item is None:                # missing → 404
+        raise HTTPException(status_code=404, detail="Item not found")
+    return item                     # only reached when the item exists
+
+
 # --- Routes ---
 
 # Health check: visit / to confirm the server is alive.
@@ -111,17 +122,13 @@ def display_items(db: Session = Depends(get_db)):
 # Get ONE item by its id (taken from the address, e.g. /items/3).
 @app.get("/items/{item_id}", response_model=ItemOut)
 def display_item(item_id: int, db: Session = Depends(get_db)):
-    item = db.get(Item, item_id)    # go straight to that id's "locker"; None if it doesn't exist
-    if item is None:                # check FIRST: missing item → clear 404 instead of a 500 crash
-        raise HTTPException(status_code=404, detail="Item not found")
-    return item                     # only reached when the item exists
+    item = get_items(item_id, db)   # the helper finds it or stops with a 404
+    return item
 
 # Update an item. Send ONLY what changed, e.g. {"price": 230000}.
 @app.put("/items/{item_id}", response_model=ItemOut)
 def edit_item(item_id: int, item_in: ItemUpdate, db: Session = Depends(get_db)):
-    item = db.get(Item, item_id)    # find it in its "locker"
-    if item is None:                # missing → 404
-        raise HTTPException(status_code=404, detail="Item not found")
+    item = get_items(item_id, db)
 
     # exclude_unset=True: keep ONLY the fields the visitor actually sent,
     # so the fields they left out aren't wiped to None.
@@ -141,11 +148,9 @@ def edit_item(item_id: int, item_in: ItemUpdate, db: Session = Depends(get_db)):
 # Delete an item. 204 = "done, nothing to send back".
 @app.delete("/items/{item_id}", status_code=204)
 def delete_item(item_id: int, db: Session = Depends(get_db)):
-    item = db.get(Item, item_id)    # find it
-    if item is None:                # missing → 404
-        raise HTTPException(status_code=404, detail="Item not found")
+    item = get_items(item_id, db)
     db.delete(item)                 # put "remove this" in the cart
-    db.commit()                     # pay: now it's gone from roomfund.db
+    db.commit()                    # pay: now it's gone from roomfund.db
                                     # no return: a 204 sends an empty reply
 
 # See your savings numbers. No id in the address: there's only one settings row.
