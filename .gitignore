@@ -13,3 +13,7 @@ __pycache__/
 
 # Claude Code's local settings for this machine
 .claude/settings.local.json
+
+# My personal notes and diary: for me, not part of the code
+claude_notes.md
+journal.md
