@@ -6,12 +6,12 @@
 # ---------------------------------------------------------
 
 
-# sort_items: put items in BUYING ORDER.
+# arrange_items: put items in BUYING ORDER.
 # Rule: high priority first, then medium, then low.
 #       Inside the same priority, cheapest first.
 # Input:  all_items = a list of item dictionaries (name, price, priority...)
 # Output: one new list of the same items, in buying order.
-def sort_items(all_items):
+def arrange_items(all_items):
     # Step 1: three empty "baskets", made fresh on every call
     # (so calling the function twice never mixes old items in).
     high_unsorted=[]
@@ -54,7 +54,7 @@ def sort_items(all_items):
 def buy_timeline(all_items, income_available, monthly_income):
     running_total = 0              # the "till" starts at zero
     running_total_list = []        # collects one result dictionary per item
-    full_list = sort_items(all_items)   # call our own sorter first, so the order handed in never matters
+    full_list = arrange_items(all_items)   # call our own sorter first, so the order handed in never matters
     money_i_have = income_available    # a COPY of what the user typed; this one will grow
     month = 0                          # month 0 = today
     for item in full_list:

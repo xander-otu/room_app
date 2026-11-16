@@ -90,6 +90,14 @@ def get_items(item_id: int, db: Session) -> Item:
     return item                     # only reached when the item exists
 
 
+# get_all_items: fetch EVERY item from the database, as a list.
+# Kept in a helper so any route (GET /items, /timeline...) can reuse it.
+def get_all_items(db: Session) -> list[Item]:
+    # select(Item) = "SELECT * FROM items"; .scalars() unwraps rows into Item objects; .all() collects them in a list
+    items = db.execute(select(Item)).scalars().all()
+    return items                                       # a list of Item objects (rows)
+
+
 # --- Routes ---
 
 # Health check: visit / to confirm the server is alive.
@@ -114,8 +122,7 @@ def create_item(item_in: ItemCreate, db: Session = Depends(get_db)):
 # List every item. list[ItemOut] = "send back a list of delivery notes".
 @app.get("/items", response_model=list[ItemOut])
 def display_items(db: Session = Depends(get_db)):
-    # select(Item) = "SELECT * FROM items"; .scalars() unwraps rows into Item objects; .all() collects them in a list
-    items = db.execute(select(Item)).scalars().all()
+    items = get_all_items(db)   # the helper fetches every item; the route just passes its db in
     return items
 
 
@@ -170,3 +177,10 @@ def update_settings(settings_in: SettingsUpdate, db: Session = Depends(get_db)):
     db.commit()                          # save (no add(): the session already watches this row)
     db.refresh(settings)                 # re-read so we return exactly what's saved
     return settings
+
+# Timeline: WHEN can the user afford each item? (still being built)
+# The route is the "delivery guy": fetch what buy_timeline needs, hand it over, send the answer back.
+@app.get("/timeline")
+def sort_items(db: Session = Depends(get_db)):
+    all_items = get_all_items(db)   # step 1a: bring out every item from the database
+    
