@@ -4,7 +4,6 @@
 # hands them in; this file works out the buying order
 # and WHEN each item can be bought.
 # ---------------------------------------------------------
-import math                                # (not used yet)
 from decimal import Decimal, ROUND_HALF_UP # Decimal: exact maths for rounding to the nearest naira
 
 # arrange_items: put items in BUYING ORDER.
@@ -65,16 +64,15 @@ def calculate_new_price(current_price, monthly_increase_percent, months):
 #         (later, main.py will get these two from the settings table)
 # Output: a list of small dictionaries, one per item: name, running total, month.
 def buy_timeline(all_items, income_available, monthly_income):
-    running_total = 0              # the "till" starts at zero
+    running_total = 0              # total spent so far; the "till" starts at zero
     running_total_list = []        # collects one result dictionary per item
     full_list = arrange_items(all_items)   # call our own sorter first, so the order handed in never matters
     money_i_have = income_available    # a COPY of what the user typed; it grows and shrinks
     month = 0                          # month 0 = today
     for item in full_list:
         item_price = int(item["price"])    # today's price, from the item
-        running_total += item["price"]     # += means: running_total = running_total + price (today's prices, no inflation)
         name = item["name"]                # pull this item's name out of its dictionary
-        percent = int(item["monthly_price_increase_pct"])   # how fast this item's price rises each month
+        percent = item["monthly_price_increase_pct"]   # how fast this item's price rises each month (no int(): keeps 2.5 as 2.5)
         duplicate_price = item_price       # the ORIGINAL price, kept safe: the formula always starts from this
         # CATCH-UP: prices don't wait for you. If months already passed while saving for
         # earlier items, this item's price has been rising too, so grow it to "now".
@@ -90,8 +88,8 @@ def buy_timeline(all_items, income_available, monthly_income):
 
         # BUY IT: the money leaves your pocket (the price as it is NOW, not the old one)
         money_i_have = money_i_have - new_price
+        running_total += new_price         # total SPENT so far, at the prices you actually paid (with inflation)
         # One "row" of the answer: labels are fixed text, values are variables
         family = {"Item" : name, "Running Total" : running_total, "Month": month}
         running_total_list.append(family)  # add this row to the results
-        month_count = 0                    # (left over from an earlier idea; not used anymore)
     return running_total_list          # just the list of rows (each row already has its month)
