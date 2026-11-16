@@ -77,19 +77,38 @@ def buy_timeline(all_items, income_available, monthly_income):
         # CATCH-UP: prices don't wait for you. If months already passed while saving for
         # earlier items, this item's price has been rising too, so grow it to "now".
         new_price = calculate_new_price(duplicate_price, percent, month)
+        duplicate_new_price = new_price
         # Keep going WHILE the money is NOT enough yet for this item.
         # Each round = one more month: savings come in, a month passes, the price rises again.
         # month is NOT reset per item: the next item carries on from here.
         # (If there's already enough, the while is skipped and the item is bought this month.)
+        gave_up = False                    # the "note": False = still trying, True = can never catch it
+        month_before = month               # remember where we were, in case we give up on this item
+        money_before = money_i_have
         while new_price > money_i_have:
             money_i_have += monthly_income   # the money grows by one month of savings
+            duplicate_new_price = new_price  # PHOTO of last month's price, before it changes
             month += 1                       # one more month has passed
             new_price = calculate_new_price(duplicate_price, percent, month)   # the price at THIS month
 
-        # BUY IT: the money leaves your pocket (the price as it is NOW, not the old one)
-        money_i_have = money_i_have - new_price
-        running_total += new_price         # total SPENT so far, at the prices you actually paid (with inflation)
-        # One "row" of the answer: labels are fixed text, values are variables
-        family = {"Item" : name, "Running Total" : running_total, "Month": month}
-        running_total_list.append(family)  # add this row to the results
+            # HOPELESS? Still not enough money, AND the price jumped by as much as
+            # (or more than) a month of savings. Compound growth means the jumps only
+            # get bigger, so the gap will never close: give up.
+            if new_price > money_i_have and monthly_income <= (new_price - duplicate_new_price):
+                gave_up = True               # leave the note for the code below
+                break                        # get out of the while loop now
+
+        if gave_up:
+            # We did NOT buy it: no money leaves the pocket.
+            # Go back to before we tried, so the next items aren't pushed later for nothing.
+            month = month_before
+            money_i_have = money_before
+            family = {"Item" : name, "Running Total" : running_total, "Month": "never"}
+        else:
+            # BUY IT: the money leaves your pocket (the price as it is NOW, not the old one)
+            money_i_have = money_i_have - new_price
+            running_total += new_price         # total SPENT so far, at the prices you actually paid (with inflation)
+            # One "row" of the answer: labels are fixed text, values are variables
+            family = {"Item" : name, "Running Total" : running_total, "Month": month}
+        running_total_list.append(family)  # add this row to the results (bought OR flagged)
     return running_total_list          # just the list of rows (each row already has its month)
