@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session                    # the type of `db`, so VS 
 from database import get_db                           # the gatekeeper: hands each request its own session
 from models import Item, Settings                     # the database table classes
 from sqlalchemy import select                         # select: builds a "fetch rows" query
-
+from timeline import arrange_items, buy_timeline
 
 # Create the app. Every route below is attached to this object.
 app = FastAPI()
@@ -178,9 +178,30 @@ def update_settings(settings_in: SettingsUpdate, db: Session = Depends(get_db)):
     db.refresh(settings)                 # re-read so we return exactly what's saved
     return settings
 
-# Timeline: WHEN can the user afford each item? (still being built)
+# Timeline: WHEN can the user afford each item?
 # The route is the "delivery guy": fetch what buy_timeline needs, hand it over, send the answer back.
 @app.get("/timeline")
 def sort_items(db: Session = Depends(get_db)):
-    all_items = get_all_items(db)   # step 1a: bring out every item from the database
-    
+    # Step 1: the ITEMS. The database gives rows (they use dots),
+    # but timeline.py wants dictionaries (they use ["..."]), so we convert each one.
+    all_items_unchanged = get_all_items(db)   # a list of database rows
+    all_items = []                            # will collect the dictionaries
+    for item in all_items_unchanged:          # one row at a time (these tools only take ONE)
+        all_items_pydantic = ItemOut.model_validate(item)   # row → Pydantic (works thanks to from_attributes)
+        one_item = all_items_pydantic.model_dump()          # Pydantic → dictionary
+        all_items.append(one_item)
+
+    # Step 2: the SETTINGS. Only one row, so no loop. Same two steps: row → Pydantic → dictionary.
+    settings_unchanged = get_settings(db)
+    settings_pydantic = SettingsOut.model_validate(settings_unchanged)
+    settings = settings_pydantic.model_dump()
+
+    # It's a dictionary now, so we read it with square brackets.
+    income_available = settings["saved_so_far"]     # money saved right now
+    monthly_income = settings["monthly_savings"]    # money added every month
+
+    # Step 3: hand everything to timeline.py, which sorts and works out the months.
+    sorted_items = buy_timeline(all_items, income_available, monthly_income)
+
+    # Step 4: send the answer to the user (NOT saved in the database; we only read).
+    return sorted_items
