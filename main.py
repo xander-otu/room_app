@@ -9,9 +9,11 @@ from fastapi import FastAPI, Depends, HTTPException   # FastAPI: the app; Depend
 from pydantic import BaseModel, Field                 # BaseModel: parent of Pydantic models; Field: adds rules (gt=0, ge=0)
 from sqlalchemy.orm import Session                    # the type of `db`, so VS Code knows what it is
 from database import get_db                           # the gatekeeper: hands each request its own session
-from models import Item, Settings                     # the database table classes
-from sqlalchemy import select                         # select: builds a "fetch rows" query
+from models import Item, Settings, PriceCheck         # the database table classes
+from sqlalchemy import select, delete                 # select: "fetch rows" query; delete: "remove rows" query
 from timeline import arrange_items, buy_timeline
+from prices import buy_or_hold, estimate_monthly_pct  # the price-log "thinking" (prices.py)
+from datetime import date                             # date: a calendar day (for price checks)
 
 # Create the app. Every route below is attached to this object.
 app = FastAPI()
@@ -62,6 +64,35 @@ class SettingsUpdate(BaseModel):
     saved_so_far: int | None = Field(default=None, ge=0)
     monthly_savings: int | None = Field(default=None, ge=0)
 
+
+# PriceCheckCreate: the form for logging a price you saw.
+# checked_on is optional: leave it out and it means "today".
+class PriceCheckCreate(BaseModel):
+    price: int = Field(gt=0)                 # whole naira, above 0
+    source: str                              # "Jumia", "Jiji", "market"...
+    link: str | None = None                  # optional web link
+    checked_on: date | None = None           # e.g. "2026-11-20"; None → today
+
+# PriceCheckOut: one logged price, as we send it back.
+class PriceCheckOut(BaseModel):
+    id: int
+    item_id: int
+    price: int
+    checked_on: date
+    source: str
+    link: str | None
+
+    model_config = {"from_attributes": True}   # can read a database row directly
+
+# PriceReport: everything about one item's prices, plus the verdict.
+class PriceReport(BaseModel):
+    item_id: int
+    item_name: str
+    item_price: int                          # the price saved on the item (the starting point)
+    checks: list[PriceCheckOut]              # every price logged, oldest first
+    verdict: str                             # "BUY NOW" / "HOLD" / "NO DATA"
+    reason: str                              # one plain sentence explaining the verdict
+    estimated_monthly_pct: float | None      # how fast the price really moves (None = not enough data yet)
 
 
 # --- Helpers (NOT routes: no @app above them, so FastAPI never calls them) ---
@@ -156,6 +187,8 @@ def edit_item(item_id: int, item_in: ItemUpdate, db: Session = Depends(get_db)):
 @app.delete("/items/{item_id}", status_code=204)
 def delete_item(item_id: int, db: Session = Depends(get_db)):
     item = get_items(item_id, db)
+    # First remove this item's price checks, so no "orphan" prices are left pointing at nothing.
+    db.execute(delete(PriceCheck).where(PriceCheck.item_id == item.id))
     db.delete(item)                 # put "remove this" in the cart
     db.commit()                    # pay: now it's gone from roomfund.db
                                     # no return: a 204 sends an empty reply
@@ -205,3 +238,58 @@ def sort_items(db: Session = Depends(get_db)):
 
     # Step 4: send the answer to the user (NOT saved in the database; we only read).
     return sorted_items
+
+
+# --- Price log (Phase 5) ---
+
+# Log a price you saw for an item, e.g. POST /items/3/prices with {"price": 39000, "source": "Jiji"}.
+@app.post("/items/{item_id}/prices", response_model=PriceCheckOut, status_code=201)
+def log_price(item_id: int, check_in: PriceCheckCreate, db: Session = Depends(get_db)):
+    get_items(item_id, db)                          # 404 if the item doesn't exist (we don't need the item itself)
+    data = check_in.model_dump()                    # form → dictionary
+    if data["checked_on"] is None:                  # no date given → today
+        data["checked_on"] = date.today()
+    check = PriceCheck(item_id=item_id, **data)     # dictionary → database row (+ which item it belongs to)
+    db.add(check)
+    db.commit()
+    db.refresh(check)                               # get its new id
+    return check
+
+
+# See an item's price history + BUY NOW / HOLD.
+@app.get("/items/{item_id}/prices", response_model=PriceReport)
+def price_report(item_id: int, db: Session = Depends(get_db)):
+    item = get_items(item_id, db)                   # 404 if missing
+    # Fetch ONLY this item's checks, oldest day first (id breaks ties on the same day).
+    query = (select(PriceCheck)
+             .where(PriceCheck.item_id == item_id)
+             .order_by(PriceCheck.checked_on, PriceCheck.id))
+    checks = db.execute(query).scalars().all()
+
+    prices = [c.price for c in checks]              # just the numbers, oldest first: [45000, 42000, 39000]
+    verdict, reason = buy_or_hold(item.price, prices)   # prices.py gives back TWO things; we catch both
+
+    pct = None
+    if len(checks) >= 2:                            # need a first AND a last to measure change
+        pct = estimate_monthly_pct(checks[0].price, checks[0].checked_on,
+                                   checks[-1].price, checks[-1].checked_on)
+
+    return PriceReport(
+        item_id=item.id,
+        item_name=item.name,
+        item_price=item.price,
+        checks=checks,                              # Pydantic turns each row into a PriceCheckOut
+        verdict=verdict,
+        reason=reason,
+        estimated_monthly_pct=pct,
+    )
+
+
+# Remove one wrong price log (typo, wrong item...). 204 = done, nothing to send back.
+@app.delete("/prices/{check_id}", status_code=204)
+def delete_price(check_id: int, db: Session = Depends(get_db)):
+    check = db.get(PriceCheck, check_id)
+    if check is None:
+        raise HTTPException(status_code=404, detail="Price check not found")
+    db.delete(check)
+    db.commit()

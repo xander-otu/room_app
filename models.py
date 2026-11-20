@@ -7,6 +7,8 @@
 # Mapped: label saying "this column holds this Python type"
 # mapped_column: extra settings for a column (primary key, default...)
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy import ForeignKey   # ForeignKey: "this column points at a row in another table"
+from datetime import date           # date: a calendar day like 2026-11-20 (no time)
 
 
 # Base: every table class inherits from this, so SQLAlchemy can find them all
@@ -38,3 +40,16 @@ class Settings(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     saved_so_far: Mapped[int] = mapped_column(default=0)      # naira saved so far
     monthly_savings: Mapped[int] = mapped_column(default=0)   # naira you save each month
+
+
+# PriceCheck: one price you SAW for an item, somewhere, on some day (one row in "price_checks").
+# One item can have many price checks: like a notebook page per item, one line per price seen.
+class PriceCheck(Base):
+    __tablename__ = "price_checks"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    item_id: Mapped[int] = mapped_column(ForeignKey("items.id"))   # WHICH item this price is for (its id)
+    price: Mapped[int]                                             # whole naira you saw
+    checked_on: Mapped[date]                                       # the day you saw it
+    source: Mapped[str]                                            # where: "Jumia", "Jiji", "market"...
+    link: Mapped[str | None]                                       # optional web link to the listing
