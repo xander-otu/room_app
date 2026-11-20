@@ -53,3 +53,13 @@ class PriceCheck(Base):
     checked_on: Mapped[date]                                       # the day you saw it
     source: Mapped[str]                                            # where: "Jumia", "Jiji", "market"...
     link: Mapped[str | None]                                       # optional web link to the listing
+
+
+# SavingsLog: one time you put money aside ("I saved ₦10,000 today").
+# Used for the streak (weeks in a row) and badges.
+class SavingsLog(Base):
+    __tablename__ = "savings_logs"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    amount: Mapped[int]                                            # whole naira saved this time
+    saved_on: Mapped[date]                                         # the day you saved it

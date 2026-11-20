@@ -9,11 +9,12 @@ from fastapi import FastAPI, Depends, HTTPException   # FastAPI: the app; Depend
 from pydantic import BaseModel, Field                 # BaseModel: parent of Pydantic models; Field: adds rules (gt=0, ge=0)
 from sqlalchemy.orm import Session                    # the type of `db`, so VS Code knows what it is
 from database import get_db                           # the gatekeeper: hands each request its own session
-from models import Item, Settings, PriceCheck         # the database table classes
+from models import Item, Settings, PriceCheck, SavingsLog   # the database table classes
 from sqlalchemy import select, delete                 # select: "fetch rows" query; delete: "remove rows" query
 from timeline import arrange_items, buy_timeline
 from prices import buy_or_hold, estimate_monthly_pct  # the price-log "thinking" (prices.py)
 from datetime import date                             # date: a calendar day (for price checks)
+from progress import savings_streak, badges           # streaks + badges "thinking" (progress.py)
 
 # Create the app. Every route below is attached to this object.
 app = FastAPI()
@@ -93,6 +94,36 @@ class PriceReport(BaseModel):
     verdict: str                             # "BUY NOW" / "HOLD" / "NO DATA"
     reason: str                              # one plain sentence explaining the verdict
     estimated_monthly_pct: float | None      # how fast the price really moves (None = not enough data yet)
+
+
+# SavingsCreate: the form for "I saved some money". saved_on optional → today.
+class SavingsCreate(BaseModel):
+    amount: int = Field(gt=0)                # whole naira, above 0
+    saved_on: date | None = None
+
+# SavingsOut: one savings log, as we send it back.
+class SavingsOut(BaseModel):
+    id: int
+    amount: int
+    saved_on: date
+
+    model_config = {"from_attributes": True}
+
+# BuyForm: marking an item as bought. price_paid optional → the item's saved price.
+class BuyForm(BaseModel):
+    price_paid: int | None = Field(default=None, gt=0)
+
+# Badge + ProgressOut: your streak, totals and badges.
+class Badge(BaseModel):
+    name: str
+    description: str
+    earned: bool
+
+class ProgressOut(BaseModel):
+    streak_weeks: int            # weeks in a row with at least one save
+    total_saved_logged: int      # all the money in your savings log added up
+    items_bought: int
+    badges: list[Badge]
 
 
 # --- Helpers (NOT routes: no @app above them, so FastAPI never calls them) ---
@@ -220,6 +251,8 @@ def sort_items(db: Session = Depends(get_db)):
     all_items_unchanged = get_all_items(db)   # a list of database rows
     all_items = []                            # will collect the dictionaries
     for item in all_items_unchanged:          # one row at a time (these tools only take ONE)
+        if item.status == "bought":           # already bought → nothing left to plan for it
+            continue                          # continue = skip to the next item
         all_items_pydantic = ItemOut.model_validate(item)   # row → Pydantic (works thanks to from_attributes)
         one_item = all_items_pydantic.model_dump()          # Pydantic → dictionary
         all_items.append(one_item)
@@ -293,3 +326,77 @@ def delete_price(check_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Price check not found")
     db.delete(check)
     db.commit()
+
+
+# --- Savings, buying, streaks, badges (Phase 6) ---
+
+# Log money you saved, e.g. {"amount": 10000}. It's ALSO added to your savings total.
+@app.post("/savings", response_model=SavingsOut, status_code=201)
+def log_savings(savings_in: SavingsCreate, db: Session = Depends(get_db)):
+    data = savings_in.model_dump()
+    if data["saved_on"] is None:
+        data["saved_on"] = date.today()
+    log = SavingsLog(**data)
+    db.add(log)
+    settings = get_settings(db)
+    settings.saved_so_far += log.amount     # your pocket goes up
+    db.commit()                             # ONE commit saves both changes together
+    db.refresh(log)
+    return log
+
+
+# See every savings log, newest first.
+@app.get("/savings", response_model=list[SavingsOut])
+def list_savings(db: Session = Depends(get_db)):
+    query = select(SavingsLog).order_by(SavingsLog.saved_on.desc(), SavingsLog.id.desc())   # .desc() = biggest/newest first
+    return db.execute(query).scalars().all()
+
+
+# Remove a wrong savings log. The amount comes back OUT of your total (never below 0).
+@app.delete("/savings/{log_id}", status_code=204)
+def delete_savings(log_id: int, db: Session = Depends(get_db)):
+    log = db.get(SavingsLog, log_id)
+    if log is None:
+        raise HTTPException(status_code=404, detail="Savings log not found")
+    settings = get_settings(db)
+    settings.saved_so_far = max(0, settings.saved_so_far - log.amount)   # max(0, ...) = no negative naira
+    db.delete(log)
+    db.commit()
+
+
+# Mark an item as BOUGHT. The money leaves your savings, and it drops off the timeline.
+# Send {} to use the item's price, or {"price_paid": 38000} if you paid something else.
+@app.post("/items/{item_id}/buy", response_model=ItemOut)
+def buy_item(item_id: int, buy_in: BuyForm, db: Session = Depends(get_db)):
+    item = get_items(item_id, db)
+    if item.status == "bought":
+        raise HTTPException(status_code=400, detail="Item is already bought")   # 400 = "bad request"
+    price_paid = buy_in.price_paid or item.price       # `or`: use price_paid if given, else item.price
+    settings = get_settings(db)
+    if price_paid > settings.saved_so_far:
+        raise HTTPException(status_code=400,
+                            detail=f"Not enough savings: you have ₦{settings.saved_so_far:,}, it costs ₦{price_paid:,}")
+    settings.saved_so_far -= price_paid                # money leaves your pocket
+    item.status = "bought"
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+# Your streak, totals and badges, all in one place.
+@app.get("/progress", response_model=ProgressOut)
+def progress(db: Session = Depends(get_db)):
+    logs = db.execute(select(SavingsLog)).scalars().all()
+    items = get_all_items(db)
+    checks = db.execute(select(PriceCheck)).scalars().all()
+
+    streak = savings_streak([log.saved_on for log in logs], date.today())
+    bought = len([i for i in items if i.status == "bought"])     # count only the bought ones
+
+    stats = {"saves": len(logs), "streak": streak, "checks": len(checks), "bought": bought}
+    return ProgressOut(
+        streak_weeks=streak,
+        total_saved_logged=sum(log.amount for log in logs),     # sum() adds up all the amounts
+        items_bought=bought,
+        badges=badges(stats),
+    )
