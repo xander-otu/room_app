@@ -9,7 +9,9 @@ from fastapi import FastAPI, Depends, HTTPException   # FastAPI: the app; Depend
 from pydantic import BaseModel, Field                 # BaseModel: parent of Pydantic models; Field: adds rules (gt=0, ge=0)
 from sqlalchemy.orm import Session                    # the type of `db`, so VS Code knows what it is
 from database import get_db                           # the gatekeeper: hands each request its own session
-from models import Item, Settings, PriceCheck, SavingsLog   # the database table classes
+from models import Item, Settings, PriceCheck, SavingsLog, User   # the database table classes
+from fastapi.security import OAuth2PasswordRequestForm  # the standard login form (username + password)
+from auth import hash_password, verify_password, create_token, get_current_user   # login tools (auth.py)
 from sqlalchemy import select, delete                 # select: "fetch rows" query; delete: "remove rows" query
 from timeline import arrange_items, buy_timeline
 from prices import buy_or_hold, estimate_monthly_pct  # the price-log "thinking" (prices.py)
@@ -126,56 +128,112 @@ class ProgressOut(BaseModel):
     badges: list[Badge]
 
 
+# --- Accounts (Phase 6.5) ---
+
+# SignupForm: what you send to make an account.
+class SignupForm(BaseModel):
+    email: str = Field(min_length=3, max_length=254)
+    password: str = Field(min_length=8, max_length=72)   # 8+ characters; 72 = the most bcrypt can blend
+
+# UserOut: an account as we send it back. NO password, not even the blended one.
+class UserOut(BaseModel):
+    id: int
+    email: str
+
+    model_config = {"from_attributes": True}
+
+# Token: the wristband we hand out at login.
+class Token(BaseModel):
+    access_token: str
+    token_type: str      # always "bearer" = "whoever carries this wristband"
+
+
 # --- Helpers (NOT routes: no @app above them, so FastAPI never calls them) ---
 
-# get_settings: "get or create" the single settings row.
-# Both settings routes call this, so the logic lives in ONE place.
-# Takes db as a plain input (no Depends): the route already has a session and passes it in.
+# get_settings: "get or create" THIS USER's settings row.
+# Takes db and user as plain inputs (no Depends): the route already has them and passes them in.
 # -> Settings is a label: "this function hands back a Settings object".
-def get_settings(db: Session) -> Settings:
-    settings = db.get(Settings, 1)  # look in locker 1 (there's only ever one settings row)
-    if settings is None:            # first time ever: no row yet (NOT an error, so no 404)
-        settings = Settings(id=1)   # make a blank row; 0 and 0 come from the defaults in models.py
-        db.add(settings)            # new object → needs add()
-        db.commit()                 # save it
-        db.refresh(settings)        # re-read so the 0s are filled in
-    return settings                 # outside the if: runs every time, old row or new one
+def get_settings(db: Session, user: User) -> Settings:
+    settings = db.execute(select(Settings).where(Settings.user_id == user.id)).scalar_one_or_none()
+    # scalar_one_or_none(): "give me the one row, or None if there isn't one"
+    if settings is None:                  # this user's first time: no row yet (NOT an error, so no 404)
+        settings = Settings(user_id=user.id)   # blank row for THIS user; 0 and 0 come from the defaults
+        db.add(settings)                  # new object → needs add()
+        db.commit()                       # save it
+        db.refresh(settings)              # re-read so the 0s are filled in
+    return settings                       # outside the if: runs every time, old row or new one
 
-# get_items: find ONE item by id, or stop with a 404.
-# Used by GET one, PUT and DELETE, so the "find + 404" lines live in ONE place.
-# The raise doesn't just stop this helper: it stops the ROUTE that called it too,
-# and FastAPI turns it into the 404 reply. So routes don't need their own check.
-def get_items(item_id: int, db: Session) -> Item:
-    item = db.get(Item, item_id)    # find it in its "locker"
-    if item is None:                # missing → 404
+# get_items: find ONE of THIS USER's items by id, or stop with a 404.
+# Someone else's item ALSO gets a 404 (not "forbidden"), so strangers can't even
+# tell that item number exists.
+# The raise stops the ROUTE that called it too, and FastAPI turns it into the 404 reply.
+def get_items(item_id: int, db: Session, user: User) -> Item:
+    item = db.get(Item, item_id)                     # find it in its "locker"
+    if item is None or item.user_id != user.id:      # missing, OR not yours → 404
         raise HTTPException(status_code=404, detail="Item not found")
-    return item                     # only reached when the item exists
+    return item                                      # only reached when it exists AND it's yours
 
 
-# get_all_items: fetch EVERY item from the database, as a list.
+# get_all_items: fetch ALL of THIS USER's items, as a list.
 # Kept in a helper so any route (GET /items, /timeline...) can reuse it.
-def get_all_items(db: Session) -> list[Item]:
-    # select(Item) = "SELECT * FROM items"; .scalars() unwraps rows into Item objects; .all() collects them in a list
-    items = db.execute(select(Item)).scalars().all()
+def get_all_items(db: Session, user: User) -> list[Item]:
+    # select(Item) = "SELECT * FROM items"; .where(...) = only rows owned by this user;
+    # .scalars() unwraps rows into Item objects; .all() collects them in a list
+    items = db.execute(select(Item).where(Item.user_id == user.id)).scalars().all()
     return items                                       # a list of Item objects (rows)
 
 
 # --- Routes ---
 
-# Health check: visit / to confirm the server is alive.
+# Health check: visit / to confirm the server is alive. (Public: no login needed.)
 @app.get("/")
 def greeting():
     return {"message": "Welcome to the Room Fund API!"}
 
 
+# Make an account. Public: you can't be logged in before you have an account.
+@app.post("/signup", response_model=UserOut, status_code=201)
+def signup(form: SignupForm, db: Session = Depends(get_db)):
+    email = form.email.strip().lower()            # " Tunde@Mail.com " and "tunde@mail.com" = same person
+    taken = db.execute(select(User).where(User.email == email)).scalar_one_or_none()
+    if taken:
+        raise HTTPException(status_code=400, detail="That email already has an account")
+    user = User(email=email, hashed_password=hash_password(form.password))   # store the BLENDED password only
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+# Log in: swap your email + password for a wristband (token).
+# OAuth2PasswordRequestForm is the standard login form: it calls the email "username".
+# That's what makes the 🔒 Authorize button in /docs work.
+@app.post("/login", response_model=Token)
+def login(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    email = form.username.strip().lower()
+    user = db.execute(select(User).where(User.email == email)).scalar_one_or_none()
+    # Same message for "no such email" and "wrong password", so strangers can't
+    # test which emails have accounts.
+    if user is None or not verify_password(form.password, user.hashed_password):
+        raise HTTPException(status_code=401, detail="Wrong email or password")
+    return Token(access_token=create_token(user.id), token_type="bearer")
+
+
+# Who am I? Shows the account your wristband belongs to.
+@app.get("/me", response_model=UserOut)
+def me(user: User = Depends(get_current_user)):
+    return user
+
+
 # Add a new item. 201 = "Created", the standard reply when something new is made.
 @app.post("/items", response_model=ItemOut, status_code=201)
-def create_item(item_in: ItemCreate, db: Session = Depends(get_db)):
+def create_item(item_in: ItemCreate, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     # Build a database row (an Item object) from the checked form.
     # model_dump() turns the form into a dict: {"name": "Rug", "price": 40000, ...}
     # ** unpacks that dict into named arguments: Item(name="Rug", price=40000, ...)
     # Works because the form's field names match the table's column names exactly.
-    db_item = Item(**item_in.model_dump())
+    # user_id=user.id stamps the owner on it: the logged-in person (from their wristband).
+    db_item = Item(**item_in.model_dump(), user_id=user.id)
     db.add(db_item)        # put it in the cart (not saved yet)
     db.commit()            # pay at the counter: now it's saved in roomfund.db
     db.refresh(db_item)    # re-read the row so db_item gets its new id and status
@@ -183,21 +241,21 @@ def create_item(item_in: ItemCreate, db: Session = Depends(get_db)):
 
 # List every item. list[ItemOut] = "send back a list of delivery notes".
 @app.get("/items", response_model=list[ItemOut])
-def display_items(db: Session = Depends(get_db)):
-    items = get_all_items(db)   # the helper fetches every item; the route just passes its db in
+def display_items(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    items = get_all_items(db, user)   # the helper fetches every item; the route just passes its db in
     return items
 
 
 # Get ONE item by its id (taken from the address, e.g. /items/3).
 @app.get("/items/{item_id}", response_model=ItemOut)
-def display_item(item_id: int, db: Session = Depends(get_db)):
-    item = get_items(item_id, db)   # the helper finds it or stops with a 404
+def display_item(item_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    item = get_items(item_id, db, user)   # the helper finds it or stops with a 404
     return item
 
 # Update an item. Send ONLY what changed, e.g. {"price": 230000}.
 @app.put("/items/{item_id}", response_model=ItemOut)
-def edit_item(item_id: int, item_in: ItemUpdate, db: Session = Depends(get_db)):
-    item = get_items(item_id, db)
+def edit_item(item_id: int, item_in: ItemUpdate, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    item = get_items(item_id, db, user)
 
     # exclude_unset=True: keep ONLY the fields the visitor actually sent,
     # so the fields they left out aren't wiped to None.
@@ -216,8 +274,8 @@ def edit_item(item_id: int, item_in: ItemUpdate, db: Session = Depends(get_db)):
 
 # Delete an item. 204 = "done, nothing to send back".
 @app.delete("/items/{item_id}", status_code=204)
-def delete_item(item_id: int, db: Session = Depends(get_db)):
-    item = get_items(item_id, db)
+def delete_item(item_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    item = get_items(item_id, db, user)
     # First remove this item's price checks, so no "orphan" prices are left pointing at nothing.
     db.execute(delete(PriceCheck).where(PriceCheck.item_id == item.id))
     db.delete(item)                 # put "remove this" in the cart
@@ -226,15 +284,15 @@ def delete_item(item_id: int, db: Session = Depends(get_db)):
 
 # See your savings numbers. No id in the address: there's only one settings row.
 @app.get("/settings", response_model=SettingsOut)
-def get_settings_route(db: Session = Depends(get_db)):
-    current_setting = get_settings(db)   # the helper finds the row (or makes it with 0, 0)
+def get_settings_route(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    current_setting = get_settings(db, user)   # the helper finds the row (or makes it with 0, 0)
     return current_setting               # whatever the row holds RIGHT NOW
 
 
 # Change your savings numbers. Send only what changed, e.g. {"monthly_savings": 60000}.
 @app.put("/settings", response_model=SettingsOut)
-def update_settings(settings_in: SettingsUpdate, db: Session = Depends(get_db)):
-    settings = get_settings(db)          # no 404 check needed: the helper always returns a row
+def update_settings(settings_in: SettingsUpdate, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    settings = get_settings(db, user)          # no 404 check needed: the helper always returns a row
     changes = settings_in.model_dump(exclude_unset=True)   # only the fields actually sent
     for field, element in changes.items():
         setattr(settings, field, element)                  # settings.<field> = element
@@ -245,10 +303,10 @@ def update_settings(settings_in: SettingsUpdate, db: Session = Depends(get_db)):
 # Timeline: WHEN can the user afford each item?
 # The route is the "delivery guy": fetch what buy_timeline needs, hand it over, send the answer back.
 @app.get("/timeline")
-def sort_items(db: Session = Depends(get_db)):
+def sort_items(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     # Step 1: the ITEMS. The database gives rows (they use dots),
     # but timeline.py wants dictionaries (they use ["..."]), so we convert each one.
-    all_items_unchanged = get_all_items(db)   # a list of database rows
+    all_items_unchanged = get_all_items(db, user)   # a list of database rows
     all_items = []                            # will collect the dictionaries
     for item in all_items_unchanged:          # one row at a time (these tools only take ONE)
         if item.status == "bought":           # already bought → nothing left to plan for it
@@ -258,7 +316,7 @@ def sort_items(db: Session = Depends(get_db)):
         all_items.append(one_item)
 
     # Step 2: the SETTINGS. Only one row, so no loop. Same two steps: row → Pydantic → dictionary.
-    settings_unchanged = get_settings(db)
+    settings_unchanged = get_settings(db, user)
     settings_pydantic = SettingsOut.model_validate(settings_unchanged)
     settings = settings_pydantic.model_dump()
 
@@ -277,8 +335,8 @@ def sort_items(db: Session = Depends(get_db)):
 
 # Log a price you saw for an item, e.g. POST /items/3/prices with {"price": 39000, "source": "Jiji"}.
 @app.post("/items/{item_id}/prices", response_model=PriceCheckOut, status_code=201)
-def log_price(item_id: int, check_in: PriceCheckCreate, db: Session = Depends(get_db)):
-    get_items(item_id, db)                          # 404 if the item doesn't exist (we don't need the item itself)
+def log_price(item_id: int, check_in: PriceCheckCreate, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    get_items(item_id, db, user)                          # 404 if the item doesn't exist (we don't need the item itself)
     data = check_in.model_dump()                    # form → dictionary
     if data["checked_on"] is None:                  # no date given → today
         data["checked_on"] = date.today()
@@ -291,8 +349,8 @@ def log_price(item_id: int, check_in: PriceCheckCreate, db: Session = Depends(ge
 
 # See an item's price history + BUY NOW / HOLD.
 @app.get("/items/{item_id}/prices", response_model=PriceReport)
-def price_report(item_id: int, db: Session = Depends(get_db)):
-    item = get_items(item_id, db)                   # 404 if missing
+def price_report(item_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    item = get_items(item_id, db, user)                   # 404 if missing
     # Fetch ONLY this item's checks, oldest day first (id breaks ties on the same day).
     query = (select(PriceCheck)
              .where(PriceCheck.item_id == item_id)
@@ -320,9 +378,10 @@ def price_report(item_id: int, db: Session = Depends(get_db)):
 
 # Remove one wrong price log (typo, wrong item...). 204 = done, nothing to send back.
 @app.delete("/prices/{check_id}", status_code=204)
-def delete_price(check_id: int, db: Session = Depends(get_db)):
+def delete_price(check_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     check = db.get(PriceCheck, check_id)
-    if check is None:
+    # A price check has no owner itself: its ITEM does. So check the item's owner.
+    if check is None or db.get(Item, check.item_id).user_id != user.id:
         raise HTTPException(status_code=404, detail="Price check not found")
     db.delete(check)
     db.commit()
@@ -332,13 +391,13 @@ def delete_price(check_id: int, db: Session = Depends(get_db)):
 
 # Log money you saved, e.g. {"amount": 10000}. It's ALSO added to your savings total.
 @app.post("/savings", response_model=SavingsOut, status_code=201)
-def log_savings(savings_in: SavingsCreate, db: Session = Depends(get_db)):
+def log_savings(savings_in: SavingsCreate, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     data = savings_in.model_dump()
     if data["saved_on"] is None:
         data["saved_on"] = date.today()
-    log = SavingsLog(**data)
+    log = SavingsLog(**data, user_id=user.id)    # stamp the owner
     db.add(log)
-    settings = get_settings(db)
+    settings = get_settings(db, user)
     settings.saved_so_far += log.amount     # your pocket goes up
     db.commit()                             # ONE commit saves both changes together
     db.refresh(log)
@@ -347,18 +406,20 @@ def log_savings(savings_in: SavingsCreate, db: Session = Depends(get_db)):
 
 # See every savings log, newest first.
 @app.get("/savings", response_model=list[SavingsOut])
-def list_savings(db: Session = Depends(get_db)):
-    query = select(SavingsLog).order_by(SavingsLog.saved_on.desc(), SavingsLog.id.desc())   # .desc() = biggest/newest first
+def list_savings(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    query = (select(SavingsLog)
+             .where(SavingsLog.user_id == user.id)                            # only YOUR logs
+             .order_by(SavingsLog.saved_on.desc(), SavingsLog.id.desc()))    # .desc() = biggest/newest first
     return db.execute(query).scalars().all()
 
 
 # Remove a wrong savings log. The amount comes back OUT of your total (never below 0).
 @app.delete("/savings/{log_id}", status_code=204)
-def delete_savings(log_id: int, db: Session = Depends(get_db)):
+def delete_savings(log_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     log = db.get(SavingsLog, log_id)
-    if log is None:
+    if log is None or log.user_id != user.id:       # missing, or not yours → 404
         raise HTTPException(status_code=404, detail="Savings log not found")
-    settings = get_settings(db)
+    settings = get_settings(db, user)
     settings.saved_so_far = max(0, settings.saved_so_far - log.amount)   # max(0, ...) = no negative naira
     db.delete(log)
     db.commit()
@@ -367,12 +428,12 @@ def delete_savings(log_id: int, db: Session = Depends(get_db)):
 # Mark an item as BOUGHT. The money leaves your savings, and it drops off the timeline.
 # Send {} to use the item's price, or {"price_paid": 38000} if you paid something else.
 @app.post("/items/{item_id}/buy", response_model=ItemOut)
-def buy_item(item_id: int, buy_in: BuyForm, db: Session = Depends(get_db)):
-    item = get_items(item_id, db)
+def buy_item(item_id: int, buy_in: BuyForm, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    item = get_items(item_id, db, user)
     if item.status == "bought":
         raise HTTPException(status_code=400, detail="Item is already bought")   # 400 = "bad request"
     price_paid = buy_in.price_paid or item.price       # `or`: use price_paid if given, else item.price
-    settings = get_settings(db)
+    settings = get_settings(db, user)
     if price_paid > settings.saved_so_far:
         raise HTTPException(status_code=400,
                             detail=f"Not enough savings: you have ₦{settings.saved_so_far:,}, it costs ₦{price_paid:,}")
@@ -385,10 +446,12 @@ def buy_item(item_id: int, buy_in: BuyForm, db: Session = Depends(get_db)):
 
 # Your streak, totals and badges, all in one place.
 @app.get("/progress", response_model=ProgressOut)
-def progress(db: Session = Depends(get_db)):
-    logs = db.execute(select(SavingsLog)).scalars().all()
-    items = get_all_items(db)
-    checks = db.execute(select(PriceCheck)).scalars().all()
+def progress(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    logs = db.execute(select(SavingsLog).where(SavingsLog.user_id == user.id)).scalars().all()
+    items = get_all_items(db, user)
+    # Price checks have no owner column, so JOIN them to their item and keep the ones whose item is yours.
+    checks = db.execute(select(PriceCheck).join(Item, PriceCheck.item_id == Item.id)
+                        .where(Item.user_id == user.id)).scalars().all()
 
     streak = savings_streak([log.saved_on for log in logs], date.today())
     bought = len([i for i in items if i.status == "bought"])     # count only the bought ones

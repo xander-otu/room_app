@@ -17,11 +17,21 @@ class Base(DeclarativeBase):
     pass
 
 
+# User: one account. Everything else (items, settings, savings) belongs to a user.
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    email: Mapped[str] = mapped_column(unique=True)           # unique=True: two accounts can't share an email
+    hashed_password: Mapped[str]                              # the BLENDED password, never the real one
+
+
 # Item: one thing you want for your room (one row in the "items" table).
 class Item(Base):
     __tablename__ = "items"                                   # the table's name inside SQLite
 
     id: Mapped[int] = mapped_column(primary_key=True)         # unique number per row, given by the database
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))   # WHO owns this item
     name: Mapped[str]                                         # required text
     status: Mapped[str] = mapped_column(default="wanted")     # wanted / saving / bought; starts as "wanted"
     width_cm: Mapped[int | None]                              # optional: footprint width (floor plan)
@@ -32,18 +42,19 @@ class Item(Base):
     monthly_price_increase_pct: Mapped[float | None] = mapped_column(default=0.0)  # inflation per month, %
 
 
-# Settings: one row holding your savings info.
-# (Becomes one row PER USER in Phase 6.5.)
+# Settings: one row PER USER holding their savings info.
 class Settings(Base):
     __tablename__ = "settings"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), unique=True)   # unique: ONE settings row per user
     saved_so_far: Mapped[int] = mapped_column(default=0)      # naira saved so far
     monthly_savings: Mapped[int] = mapped_column(default=0)   # naira you save each month
 
 
 # PriceCheck: one price you SAW for an item, somewhere, on some day (one row in "price_checks").
 # One item can have many price checks: like a notebook page per item, one line per price seen.
+# No user_id here: a price check belongs to an item, and the ITEM knows its owner.
 class PriceCheck(Base):
     __tablename__ = "price_checks"
 
@@ -61,5 +72,6 @@ class SavingsLog(Base):
     __tablename__ = "savings_logs"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))   # WHO saved it
     amount: Mapped[int]                                            # whole naira saved this time
     saved_on: Mapped[date]                                         # the day you saved it
