@@ -9,6 +9,11 @@ import env  # noqa: F401  (reads the .env file first, so DATABASE_URL below can 
 #   - online (Render): DATABASE_URL = Neon's Postgres address, set in Render's settings
 #   - on my laptop:    no DATABASE_URL → the SQLite file "roomfund.db" in this folder
 DATABASE_URL = os.environ.get("DATABASE_URL") or "sqlite:///roomfund.db"
+# Safety: Render forgets files on every restart, so a SQLite file there would quietly lose
+# everyone's data. Render always sets RENDER=true, so if we're on Render without a real
+# database address, stop with a clear message instead.
+if os.environ.get("RENDER") and DATABASE_URL.startswith("sqlite"):
+    raise RuntimeError("DATABASE_URL is missing on Render. Add your Neon connection string in Render → Environment.")
 # Neon gives "postgresql://..."; SQLAlchemy needs to know which driver to use (psycopg).
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = "postgresql://" + DATABASE_URL[len("postgres://"):]
