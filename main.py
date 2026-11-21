@@ -9,7 +9,8 @@ from fastapi import FastAPI, Depends, HTTPException   # FastAPI: the app; Depend
 from pydantic import BaseModel, Field                 # BaseModel: parent of Pydantic models; Field: adds rules (gt=0, ge=0)
 from sqlalchemy.orm import Session                    # the type of `db`, so VS Code knows what it is
 from database import get_db                           # the gatekeeper: hands each request its own session
-from models import Item, Settings, PriceCheck, SavingsLog, User   # the database table classes
+from models import Item, Settings, PriceCheck, SavingsLog, User, Room   # the database table classes
+from pydantic import ValidationError                  # the error Pydantic raises when data has the wrong shape
 from fastapi.security import OAuth2PasswordRequestForm  # the standard login form (username + password)
 from auth import hash_password, verify_password, create_token, get_current_user   # login tools (auth.py)
 from sqlalchemy import select, delete                 # select: "fetch rows" query; delete: "remove rows" query
@@ -59,6 +60,7 @@ class ItemUpdate(BaseModel):
 class SettingsOut(BaseModel):
     saved_so_far: int
     monthly_savings: int
+    show_room_tab: bool                      # is the optional "My Room" tab switched on?
 
     model_config = {"from_attributes": True}   # lets Pydantic read a SQLAlchemy object (settings.saved_so_far) instead of a dict
 
@@ -66,6 +68,47 @@ class SettingsOut(BaseModel):
 class SettingsUpdate(BaseModel):
     saved_so_far: int | None = Field(default=None, ge=0)
     monthly_savings: int | None = Field(default=None, ge=0)
+    show_room_tab: bool | None = None        # send true / false to show or hide the My Room tab
+
+
+# --- Room import (the optional "My Room" tab) ---
+
+# RoomInfo: the room itself, inside a room code.
+class RoomInfo(BaseModel):
+    name: str = "My room"
+    width_cm: int | None = Field(default=None, gt=0)
+    length_cm: int | None = Field(default=None, gt=0)
+
+# RoomCode: the exact shape a Claude artifact copies with "Copy for RoomFund".
+# {"roomfund": 1, "room": {...}, "items": [ {name, price, priority, ...}, ... ]}
+# Each item uses ItemCreate, so it gets the SAME checks as adding an item by hand.
+class RoomCode(BaseModel):
+    roomfund: Literal[1]                     # the version number: proves it's a RoomFund room code
+    room: RoomInfo
+    items: list[ItemCreate] = []
+
+# What you paste into the import box (the raw copied text).
+class PasteForm(BaseModel):
+    code: str
+
+# One item in the preview: the item, plus "is this already in your list?"
+class PreviewItem(ItemCreate):
+    already_exists: bool
+
+class ImportPreview(BaseModel):
+    room: RoomInfo
+    items: list[PreviewItem]
+
+class RoomOut(BaseModel):
+    name: str
+    width_cm: int | None
+    length_cm: int | None
+
+    model_config = {"from_attributes": True}
+
+class ImportResult(BaseModel):
+    room: RoomOut
+    items_added: int
 
 
 # PriceCheckCreate: the form for logging a price you saw.
@@ -197,6 +240,20 @@ def get_all_items(db: Session, user: User) -> list[Item]:
     # .scalars() unwraps rows into Item objects; .all() collects them in a list
     items = db.execute(select(Item).where(Item.user_id == user.id)).scalars().all()
     return items                                       # a list of Item objects (rows)
+
+
+# room_bar: the 🏠 room progress bar (money of bought items ÷ money of all items).
+# A helper because both /progress and /room show it.
+def room_bar(items) -> "RoomBar":
+    total_value = sum(i.price for i in items)
+    bought_value = sum(i.price for i in items if i.status == "bought")
+    return RoomBar(percent=percent(bought_value, total_value),
+                   bought_value=bought_value, total_value=total_value)
+
+
+# get_room: THIS USER's room, or None if they haven't imported one.
+def get_room(db: Session, user: User) -> Room | None:
+    return db.execute(select(Room).where(Room.user_id == user.id)).scalar_one_or_none()
 
 
 # --- Routes ---
@@ -475,10 +532,7 @@ def progress(db: Session = Depends(get_db), user: User = Depends(get_current_use
     stats = {"saves": len(logs), "streak": streak, "checks": len(checks), "bought": bought}
 
     # Bar 1: the ROOM. Money of bought items ÷ money of all items.
-    total_value = sum(i.price for i in items)
-    bought_value = sum(i.price for i in items if i.status == "bought")
-    room = RoomBar(percent=percent(bought_value, total_value),
-                   bought_value=bought_value, total_value=total_value)
+    room = room_bar(items)
 
     # Bar 2: the NEXT item = the first not-yet-bought item in buying order
     # (same order as the timeline: priority first, then cheapest).
@@ -499,3 +553,72 @@ def progress(db: Session = Depends(get_db), user: User = Depends(get_current_use
         next_item=next_item,
         badges=badges(stats),
     )
+
+
+# --- My Room (optional tab): import a room planned with Claude ---
+
+# RoomView: the "room imported" screen: the room + its progress bar.
+class RoomView(BaseModel):
+    room: RoomOut
+    progress: RoomBar
+
+# The one friendly message for any code that isn't a proper room code.
+BAD_CODE = "That doesn't look like a RoomFund room code. Copy it again from Claude."
+
+
+# STEP 1: paste the code → see what's inside. NOTHING is saved yet.
+# Each item says already_exists=true if you already have an item with that name.
+@app.post("/room/import/preview", response_model=ImportPreview)
+def preview_room(paste: PasteForm, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    try:
+        # model_validate_json: read the text as JSON AND check it has the RoomCode shape, in one step
+        code = RoomCode.model_validate_json(paste.code.strip())
+    except ValidationError:                      # not JSON, wrong shape, bad price, unknown priority...
+        raise HTTPException(status_code=400, detail=BAD_CODE)
+    if not code.items:
+        raise HTTPException(status_code=400, detail="No items found in this room.")
+
+    # Names you already have, in lowercase, so "Fan" and "fan" count as the same.
+    my_names = {i.name.strip().lower() for i in get_all_items(db, user)}
+    items = [PreviewItem(**item.model_dump(), already_exists=item.name.strip().lower() in my_names)
+             for item in code.items]
+    return ImportPreview(room=code.room, items=items)
+
+
+# STEP 2: save it. Send the room + ONLY the items you kept ticked (edited if you like).
+# If you already had a room, it's replaced. Your existing items are never touched.
+@app.post("/room/import", response_model=ImportResult, status_code=201)
+def import_room(code: RoomCode, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    room = get_room(db, user)
+    if room is None:                             # first import → make the room row
+        room = Room(user_id=user.id, name=code.room.name)
+        db.add(room)
+    room.name = code.room.name                   # import again → update it
+    room.width_cm = code.room.width_cm
+    room.length_cm = code.room.length_cm
+
+    for item in code.items:                      # each ticked item becomes a normal item of yours
+        db.add(Item(**item.model_dump(), user_id=user.id))
+
+    db.commit()                                  # ONE commit: room + all items saved together
+    db.refresh(room)
+    return ImportResult(room=room, items_added=len(code.items))
+
+
+# The "room imported" screen. 404 = no room yet → show the empty state with "Import my room".
+@app.get("/room", response_model=RoomView)
+def my_room(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    room = get_room(db, user)
+    if room is None:
+        raise HTTPException(status_code=404, detail="No room imported yet")
+    return RoomView(room=room, progress=room_bar(get_all_items(db, user)))
+
+
+# "Remove room": forgets the room, KEEPS all your items.
+@app.delete("/room", status_code=204)
+def remove_room(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    room = get_room(db, user)
+    if room is None:
+        raise HTTPException(status_code=404, detail="No room imported yet")
+    db.delete(room)
+    db.commit()

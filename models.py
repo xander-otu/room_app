@@ -50,6 +50,19 @@ class Settings(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), unique=True)   # unique: ONE settings row per user
     saved_so_far: Mapped[int] = mapped_column(default=0)      # naira saved so far
     monthly_savings: Mapped[int] = mapped_column(default=0)   # naira you save each month
+    show_room_tab: Mapped[bool] = mapped_column(default=False)  # the optional "My Room" tab: off unless you switch it on
+
+
+# Room: the room you planned with Claude and imported (ONE per user, optional).
+# Items don't point at the room: all your items are for your room anyway.
+class Room(Base):
+    __tablename__ = "rooms"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), unique=True)   # unique: one room per user
+    name: Mapped[str]                                         # e.g. "My bedroom"
+    width_cm: Mapped[int | None]                              # optional room size (for the floor plan later)
+    length_cm: Mapped[int | None]
 
 
 # PriceCheck: one price you SAW for an item, somewhere, on some day (one row in "price_checks").
