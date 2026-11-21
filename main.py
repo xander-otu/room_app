@@ -473,7 +473,9 @@ def payday_out(row: Payday, schedule: PaySchedule) -> PaydayOut:
 # --- Routes ---
 
 # Health check: confirm the server is alive. (Public: no login needed.)
-@app.get("/health")
+# Also answers HEAD (a "just checking" request with no body), which uptime monitors
+# like UptimeRobot use. A monitor visiting this every 5 minutes keeps Render from sleeping.
+@app.api_route("/health", methods=["GET", "HEAD"])
 def greeting():
     return {"message": "Welcome to the Room Fund API!"}
 
