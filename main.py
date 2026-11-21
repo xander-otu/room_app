@@ -16,7 +16,7 @@ from sqlalchemy import select, delete                 # select: "fetch rows" que
 from timeline import arrange_items, buy_timeline
 from prices import buy_or_hold, estimate_monthly_pct  # the price-log "thinking" (prices.py)
 from datetime import date                             # date: a calendar day (for price checks)
-from progress import savings_streak, badges           # streaks + badges "thinking" (progress.py)
+from progress import savings_streak, badges, percent  # streaks, badges, progress bars (progress.py)
 
 # Create the app. Every route below is attached to this object.
 app = FastAPI()
@@ -121,10 +121,26 @@ class Badge(BaseModel):
     description: str
     earned: bool
 
+# RoomBar: "how much of my room have I bought?" (by money, so a lamp doesn't count like a bed)
+class RoomBar(BaseModel):
+    percent: int                 # 0–100
+    bought_value: int            # ₦ of the items you've bought (their listed prices)
+    total_value: int             # ₦ of ALL your items
+
+# NextItemBar: "how close am I to the next thing on my list?"
+class NextItemBar(BaseModel):
+    item_id: int
+    name: str
+    price: int                   # its price today
+    saved: int                   # what you have now
+    percent: int                 # 0–100 (100 = you can buy it now!)
+
 class ProgressOut(BaseModel):
     streak_weeks: int            # weeks in a row with at least one save
     total_saved_logged: int      # all the money in your savings log added up
     items_bought: int
+    room: RoomBar
+    next_item: NextItemBar | None   # None = nothing left to buy 🎉
     badges: list[Badge]
 
 
@@ -457,9 +473,29 @@ def progress(db: Session = Depends(get_db), user: User = Depends(get_current_use
     bought = len([i for i in items if i.status == "bought"])     # count only the bought ones
 
     stats = {"saves": len(logs), "streak": streak, "checks": len(checks), "bought": bought}
+
+    # Bar 1: the ROOM. Money of bought items ÷ money of all items.
+    total_value = sum(i.price for i in items)
+    bought_value = sum(i.price for i in items if i.status == "bought")
+    room = RoomBar(percent=percent(bought_value, total_value),
+                   bought_value=bought_value, total_value=total_value)
+
+    # Bar 2: the NEXT item = the first not-yet-bought item in buying order
+    # (same order as the timeline: priority first, then cheapest).
+    not_bought = [{"id": i.id, "name": i.name, "price": i.price, "priority": i.priority}
+                  for i in items if i.status != "bought"]
+    next_item = None
+    if not_bought:                                    # an empty list counts as False
+        first = arrange_items(not_bought)[0]          # [0] = the first one in the line
+        saved = get_settings(db, user).saved_so_far
+        next_item = NextItemBar(item_id=first["id"], name=first["name"], price=first["price"],
+                                saved=saved, percent=percent(saved, first["price"]))
+
     return ProgressOut(
         streak_weeks=streak,
         total_saved_logged=sum(log.amount for log in logs),     # sum() adds up all the amounts
         items_bought=bought,
+        room=room,
+        next_item=next_item,
         badges=badges(stats),
     )

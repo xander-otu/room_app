@@ -43,6 +43,14 @@ BADGES = [
 ]
 
 
+# percent: "how full is the bar?" as a whole number from 0 to 100.
+# e.g. 25,000 of 40,000 → 62.  Never above 100, and 0 if there's nothing to fill.
+def percent(part, whole) -> int:
+    if whole <= 0:
+        return 0
+    return min(100, int(part / whole * 100))   # min(100, ...) = cap it at a full bar
+
+
 # badges: which badges you've earned.
 # Input: your numbers so far, e.g. {"saves": 3, "streak": 2, "checks": 0, "bought": 1}
 # Output: a list of {"name", "description", "earned": True/False}
