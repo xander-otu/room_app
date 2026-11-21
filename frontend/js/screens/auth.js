@@ -27,14 +27,19 @@ export async function playSplash(renderNext, { greet = null } = {}) {
   word.style.opacity = "0"; tag.style.opacity = "0"; mark.style.opacity = "0";
   const easeOutBack = "cubic-bezier(.34,1.56,.64,1)";
 
+  // Wait (max ~1s) for the pixel font and the logo image, so nothing changes size mid-animation.
+  await Promise.race([Promise.all([document.fonts?.ready, mark.decode?.().catch(() => {})]), wait(1000)]);
+  // The wordmark keeps its place in the layout the whole time (only invisible), so the logo
+  // never jumps. `shift` = how far right the logo sits so it LOOKS centred on its own.
+  const shift = (word.getBoundingClientRect().width + 10) / 2;     // 10 = the gap between them
+
   // 1. Mark scales 0.25 → 0.9 at the centre and fades in (wait 0.2s, 0.5s).
-  word.style.display = "none";
-  await mark.animate([{ transform: "scale(.25)", opacity: 0 }, { transform: "scale(.9)", opacity: 1 }],
+  await mark.animate([{ transform: `translateX(${shift}px) scale(.25)`, opacity: 0 }, { transform: `translateX(${shift}px) scale(.9)`, opacity: 1 }],
     { duration: 500, delay: 200, easing: easeOutBack, fill: "forwards" }).finished;
   // 2. Mark slides left + scales to 0.72; wordmark slides in from +24px (wait 0.3s, 0.5s).
-  word.style.display = "";
+  //    One smooth move from exactly where step 1 ended.
   await wait(300);
-  mark.animate([{ transform: `translateX(${word.offsetWidth / 2 + 5}px) scale(.9)` }, { transform: "translateX(0) scale(.72)" }],
+  mark.animate([{ transform: `translateX(${shift}px) scale(.9)`, opacity: 1 }, { transform: "translateX(0) scale(.72)", opacity: 1 }],
     { duration: 500, easing: "ease-in-out", fill: "forwards" });
   await word.animate([{ transform: "translateX(24px)", opacity: 0 }, { transform: "none", opacity: 1 }],
     { duration: 500, easing: "ease-in-out", fill: "forwards" }).finished;

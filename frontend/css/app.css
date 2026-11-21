@@ -500,7 +500,7 @@ button.card, .card.press { width: 100%; text-align: left; }
 .splash { position: fixed; inset: 0; z-index: 100; background: var(--page); display: grid; place-items: center; }
 .splash .group { display: flex; flex-direction: column; align-items: center; gap: 12px; }
 .splash .lockup { display: flex; align-items: center; gap: 10px; }
-.splash .mark { width: 76px; height: auto; }      /* the Figma mark is 101 × 80 (with its shadow) */
+.splash .mark { width: 76px; height: 60px; flex: none; }   /* fixed size (Figma mark is 101 × 80): no pop when the image loads */
 .splash .wordmark { font-size: 40px; }
 .splash .tag { font-family: "Pixelify Sans", monospace; font-size: 16px; color: var(--text-muted); }
 .greeting { position: fixed; inset: 0; z-index: 90; background: var(--page); display: grid; place-items: center; }
