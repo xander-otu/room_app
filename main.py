@@ -11,7 +11,7 @@ import secrets as pysecrets
 from datetime import date, datetime, timedelta        # date: a calendar day; datetime: a day + time
 from typing import Literal                            # Literal: allow ONLY specific exact values
 
-from fastapi import FastAPI, Depends, HTTPException, Request, UploadFile, File   # the app, helpers, errors, uploads
+from fastapi import FastAPI, Depends, HTTPException, Request, UploadFile, File, Response   # the app, helpers, errors, uploads, raw replies
 from fastapi.security import OAuth2PasswordRequestForm  # the standard login form (username + password)
 from fastapi.staticfiles import StaticFiles           # serves plain files (the web page, photos)
 from pydantic import BaseModel, Field, ValidationError  # BaseModel: parent of Pydantic models; Field: adds rules
@@ -19,7 +19,7 @@ from sqlalchemy import select, delete, func           # select: "fetch rows"; de
 from sqlalchemy.orm import Session                    # the type of `db`, so VS Code knows what it is
 
 from database import get_db                           # the gatekeeper: hands each request its own session
-from models import (Item, Settings, PriceCheck, SavingsLog, User, Room,   # the database table classes
+from models import (Item, ItemPhoto, Settings, PriceCheck, SavingsLog, User, Room,   # the database table classes
                     PaySchedule, Payday, UserBadge, PasswordReset)
 from auth import (hash_password, verify_password, create_token, get_current_user,   # login tools (auth.py)
                   verify_google_token, make_reset_token, hash_reset_token, GOOGLE_CLIENT_ID)
@@ -453,9 +453,12 @@ def sync_badges(db: Session, user: User) -> tuple[list[BadgeOut], list[BadgeOut]
     return earned_list + locked_list, [b for b in all_badges if b.key in new_keys]
 
 
-def delete_photo_file(photo_url: str | None):
-    if photo_url and photo_url.startswith("/uploads/"):
-        path = os.path.join(UPLOADS_DIR, os.path.basename(photo_url))
+# delete_photo: forget an item's photo: the stored picture in the database, plus any
+# old-style file in the uploads/ folder (photos from before they moved into the database).
+def delete_photo(db: Session, item: Item):
+    db.execute(delete(ItemPhoto).where(ItemPhoto.item_id == item.id))
+    if item.photo_url and item.photo_url.startswith("/uploads/"):
+        path = os.path.join(UPLOADS_DIR, os.path.basename(item.photo_url))
         if os.path.exists(path):
             os.remove(path)
 
@@ -638,7 +641,7 @@ def delete_item(item_id: int, db: Session = Depends(get_db), user: User = Depend
     item = get_items(item_id, db, user)
     # First remove this item's price checks, so no "orphan" prices are left pointing at nothing.
     db.execute(delete(PriceCheck).where(PriceCheck.item_id == item.id))
-    delete_photo_file(item.photo_url)
+    delete_photo(db, item)          # and its photo
     db.delete(item)                 # put "remove this" in the cart
     db.commit()                     # pay: now it's gone from roomfund.db
 
@@ -667,10 +670,12 @@ def upload_photo(item_id: int, photo: UploadFile = File(...), db: Session = Depe
         raise HTTPException(status_code=400, detail="Use a JPG, PNG or WebP photo.")
     if fmt == "JPEG" and img.mode not in ("RGB", "L"):
         img = img.convert("RGB")
-    filename = f"item_{item.id}_{pysecrets.token_hex(4)}.{FORMATS[fmt]}"
-    img.save(os.path.join(UPLOADS_DIR, filename), format=fmt)
-    delete_photo_file(item.photo_url)             # replace the old photo
-    item.photo_url = f"/uploads/{filename}"
+    out = io.BytesIO()
+    img.save(out, format=fmt)                     # the resized picture, as bytes
+    delete_photo(db, item)                        # replace the old photo
+    token = pysecrets.token_hex(8)                # random, so nobody can guess other people's photo addresses
+    db.add(ItemPhoto(item_id=item.id, token=token, content_type=f"image/{FORMATS[fmt].replace('jpg', 'jpeg')}", data=out.getvalue()))
+    item.photo_url = f"/photos/{item.id}/{token}"
     db.commit()
     db.refresh(item)
     _, new = sync_badges(db, user)                # Snapshot badge
@@ -680,9 +685,21 @@ def upload_photo(item_id: int, photo: UploadFile = File(...), db: Session = Depe
 @app.delete("/items/{item_id}/photo", status_code=204)
 def remove_photo(item_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     item = get_items(item_id, db, user)
-    delete_photo_file(item.photo_url)
+    delete_photo(db, item)
     item.photo_url = None
     db.commit()
+
+
+# Show a photo. Public (an <img> can't send the login token), but the address has a
+# random token in it, so only someone who was shown the address can open it.
+# A new upload gets a new address, so browsers may keep a copy for a long time.
+@app.get("/photos/{item_id}/{token}")
+def get_photo(item_id: int, token: str, db: Session = Depends(get_db)):
+    photo = db.execute(select(ItemPhoto).where(ItemPhoto.item_id == item_id)).scalar_one_or_none()
+    if photo is None or not pysecrets.compare_digest(photo.token, token):
+        raise HTTPException(status_code=404, detail="Photo not found")
+    return Response(content=photo.data, media_type=photo.content_type,
+                    headers={"Cache-Control": "public, max-age=31536000, immutable"})
 
 
 # See your savings numbers and display choices.

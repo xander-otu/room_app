@@ -1,0 +1,20 @@
+# render.yaml: tells Render how to run RoomFund (a "Blueprint").
+# Secrets are NOT written here (this file is public on GitHub): Render asks for them
+# when you create the service (sync: false = "ask me, don't store it in the file").
+services:
+  - type: web
+    name: roomfund
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.10"            # the same Python as on my laptop
+      - key: DATABASE_URL           # Neon's connection string (postgresql://...)
+        sync: false
+      - key: SECRET_KEY             # signs login tokens: a NEW long random value, not my laptop's
+        generateValue: true
+      - key: GOOGLE_CLIENT_ID       # optional: for Continue with Google
+        sync: false

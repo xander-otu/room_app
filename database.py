@@ -1,15 +1,28 @@
+import os
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import sessionmaker
 from models import Base
+import env  # noqa: F401  (reads the .env file first, so DATABASE_URL below can come from it)
 
 
-#this is where the database lives, ":/// means 'in this very folder'"
-DATABASE_URL = "sqlite:///roomfund.db"
+# Where the database lives:
+#   - online (Render): DATABASE_URL = Neon's Postgres address, set in Render's settings
+#   - on my laptop:    no DATABASE_URL → the SQLite file "roomfund.db" in this folder
+DATABASE_URL = os.environ.get("DATABASE_URL") or "sqlite:///roomfund.db"
+# Neon gives "postgresql://..."; SQLAlchemy needs to know which driver to use (psycopg).
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = "postgresql://" + DATABASE_URL[len("postgres://"):]
+if DATABASE_URL.startswith("postgresql://"):
+    DATABASE_URL = "postgresql+psycopg://" + DATABASE_URL[len("postgresql://"):]
+IS_SQLITE = DATABASE_URL.startswith("sqlite")
 
-# the engine: our app's connection to the database file, made once
+# the engine: our app's connection to the database, made once
 engine = create_engine(
     DATABASE_URL,
-    connect_args= {"check_same_thread": False},
+    # SQLite only: let FastAPI's threads share the file
+    connect_args={"check_same_thread": False} if IS_SQLITE else {},
+    # Neon closes idle connections (it sleeps after 5 min): test each one before using it
+    pool_pre_ping=not IS_SQLITE,
 )
 
 #this is the session maker, it is a class used in creating sessions
@@ -82,8 +95,11 @@ def upgrade_users_table():
         conn.execute(text("ALTER TABLE users_new RENAME TO users"))
 
 
-upgrade_users_table()
-add_missing_columns()
+# Only my old SQLite file needs upgrading. A new Postgres database (Neon) gets every
+# table and column straight from create_all above.
+if IS_SQLITE:
+    upgrade_users_table()
+    add_missing_columns()
 
 
 #this is a function that creates a session, pauses it and then closes it when done

@@ -7,7 +7,7 @@
 # Mapped: label saying "this column holds this Python type"
 # mapped_column: extra settings for a column (primary key, default...)
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
-from sqlalchemy import ForeignKey, UniqueConstraint   # ForeignKey: "this column points at a row in another table"
+from sqlalchemy import ForeignKey, UniqueConstraint, LargeBinary   # ForeignKey: "this column points at a row in another table"
 from datetime import date, datetime                   # date: a calendar day; datetime: a day + a time
 
 
@@ -60,6 +60,19 @@ class Item(Base):
     bought_price: Mapped[int | None]                          # what you REALLY paid (for "Bought for ₦175,000")
     bought_on: Mapped[date | None]                            # the day you bought it
     room_id: Mapped[int | None] = mapped_column(ForeignKey("rooms.id"))   # set when it came from a room import
+
+
+# ItemPhoto: the photo itself (the picture's bytes), stored IN the database.
+# Online, Render forgets files on every restart, so photos can't live in a folder there.
+# After resizing (max 1200px) a photo is small, so the database holds them easily.
+class ItemPhoto(Base):
+    __tablename__ = "item_photos"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    item_id: Mapped[int] = mapped_column(ForeignKey("items.id"), unique=True)   # one photo per item
+    token: Mapped[str]                                        # random part of the address: /photos/3/ab12cd34
+    content_type: Mapped[str]                                 # "image/jpeg", "image/png" or "image/webp"
+    data: Mapped[bytes] = mapped_column(LargeBinary)          # the picture itself
 
 
 # Settings: one row PER USER holding their savings info.

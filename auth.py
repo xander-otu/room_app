@@ -13,24 +13,16 @@ from fastapi import Depends, HTTPException
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 
+import env  # noqa: F401  (reads the .env file into the environment)
 from database import get_db
 from models import User
 
 
-# --- The secret key: signs every token. Lives in .env (never on GitHub). ---
-# Tiny .env reader: each line looks like NAME=value.
-def _read_env_file(path=".env"):
-    if os.path.exists(path):
-        with open(path) as f:                   # with: opens the file and closes it when done
-            for line in f:
-                if "=" in line and not line.startswith("#"):
-                    name, value = line.strip().split("=", 1)   # split at the FIRST "=" only
-                    os.environ.setdefault(name, value)         # setdefault: don't overwrite a real env var
-
-_read_env_file()
+# --- The secret key: signs every token. On my laptop it's in .env (never on GitHub);
+#     online it's set in Render's Environment settings. ---
 SECRET_KEY = os.environ.get("SECRET_KEY")
 if not SECRET_KEY:
-    raise RuntimeError("SECRET_KEY is missing. Add SECRET_KEY=... to the .env file.")
+    raise RuntimeError("SECRET_KEY is missing. Add SECRET_KEY=... to the .env file (or Render's Environment).")
 
 ALGORITHM = "HS256"                 # the signing method (standard, simple)
 TOKEN_LIFETIME = timedelta(days=1)  # the wristband stops working after 1 day → log in again
