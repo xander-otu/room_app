@@ -2,21 +2,38 @@
 // progress.js: the progress bar component (Section 11) and
 // the 08 Progress screen with badges (Section 12).
 // ---------------------------------------------------------
-import { h, px, button, api, store, naira, money, errorCard, skeleton, haptic } from "../lib.js";
+import { h, px, button, api, store, naira, money, errorCard, skeleton, haptic, reduceMotion } from "../lib.js";
 import { icon } from "../icons.js";
 import { go } from "../app.js";
 import { BADGE_ICONS, showBadges, confetti } from "../fx.js";
 
-const BLOCKS = 16;
+const BLOCK = 16, GAP = 3;      // square blocks, 16px wide with 3px gaps (Section 11)
 
-// progressBar: label + % on one row, a track of square blocks, a "₦X saved of ₦Y" line.
+// progressBar: label + % on one row, a pixel track of square blocks, a "₦X saved of ₦Y" line.
+// As many blocks as fit the track; filled blocks = round(percent × block count).
+// The filled blocks light up one after another when the bar appears.
 // kind "next": 100% shows "You can buy it now!" + a link to that item.
 export function progressBar({ label, percent, under, kind = "next", itemId = null }) {
   const full = percent >= 100;
-  const on = Math.round((Math.min(100, percent) / 100) * BLOCKS);
+  const blocks = h("div", { class: "blocks" });
+  let drawnFor = 0;
+  const fill = () => {
+    const width = blocks.clientWidth;
+    if (!width || width === drawnFor) return;
+    drawnFor = width;
+    const count = Math.max(4, Math.floor((width + GAP) / (BLOCK + GAP)));
+    const on = Math.round((Math.min(100, percent) / 100) * count);
+    blocks.replaceChildren(...Array.from({ length: count }, (_, i) => h("span", { class: `blk ${i < on ? "on" : ""}` })));
+    if (!reduceMotion()) {
+      [...blocks.children].slice(0, on).forEach((b, i) =>
+        b.animate([{ transform: "scaleY(.2)", opacity: 0 }, { transform: "scaleY(1.25)", opacity: 1, offset: .7 }, { transform: "none", opacity: 1 }],
+          { duration: 260, delay: 120 + i * 35, easing: "ease-out", fill: "backwards" }));
+    }
+  };
+  new ResizeObserver(fill).observe(blocks);       // works out the count once it's on screen (and on resize)
   return h("div", { class: `pbar ${full ? "full" : ""}`, role: "progressbar", "aria-valuenow": String(percent), "aria-valuemin": "0", "aria-valuemax": "100", "aria-label": label },
     h("div", { class: "row" }, h("span", { class: "lbl" }, label), h("span", { class: "pct num" }, `${percent}%`)),
-    px("div", "track", [h("div", { class: "blocks" }, ...Array.from({ length: BLOCKS }, (_, i) => h("span", { class: `blk ${i < on ? "on" : ""}` })))]),
+    px("div", "track", [blocks]),
     h("div", { class: "under" }, ...under),
     full && kind === "next" && itemId ? h("button", { type: "button", class: "ready link press", onclick: () => go(`/items/${itemId}`) }, "You can buy it now! →") : null,
   );

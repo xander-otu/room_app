@@ -6,9 +6,10 @@
 
 const GRIDS = {
   gear: [
-    "....####....", "..#.####.#..", ".##########.", "..###..###..",
-    "####....####", "###......###", "###......###", "####....####",
-    "..###..###..", ".##########.", "..#.####.#..", "....####....",
+    "......##......", "..#...##...#..", ".###.####.###.", "..##########..",
+    "...########...", ".####....####.", "#####....#####", "#####....#####",
+    ".####....####.", "...########...", "..##########..", ".###.####.###.",
+    "..#...##...#..", "......##......",
   ],
   back: [
     "............", ".....#......", "....##......", "...###......",
@@ -206,6 +207,57 @@ export function icon(name, cls = "") {
   });
   const span = document.createElement("span");
   span.innerHTML = `<svg class="pi ${cls}" viewBox="0 0 ${size} ${size}" fill="currentColor" aria-hidden="true">${rects}</svg>`;
+  return span.firstChild;
+}
+
+// ---------- Tab bar icons, with named parts so they can animate ----------
+// Each character other than "." is a PART: pixels with the same character become one
+// <g class="part" data-part="X"> group, so fx.js can move that part on its own.
+const TAB_GRIDS = {
+  list: [   // dots (D) + three dashes (A, B, C) that shoot out of the dots
+    "............", "DD.AAAAAAAA.", "DD.AAAAAAAA.", "............",
+    "............", "DD.BBBBBBBB.", "DD.BBBBBBBB.", "............",
+    "............", "DD.CCCCCCCC.", "DD.CCCCCCCC.", "............",
+  ],
+  calendar: [   // frame (#) + six dates (1-6) that blink out and back
+    "..#....#....", "############", "############", "#..........#",
+    "#.11.22.33.#", "#.11.22.33.#", "#..........#", "#.44.55.66.#",
+    "#.44.55.66.#", "#..........#", "############", "............",
+  ],
+  floor: [   // walls (#) + furniture (1-4) that pops into the room
+    "############", "#.....#....#", "#.....#....#", "#..11.#.22.#",
+    "#..11......#", "#.....#....#", "####.##....#", "#..........#",
+    "#.33..######", "#.33..#....#", "#.....#.44.#", "############",
+  ],
+  coins: [   // five coins (1 = top ... 5 = bottom) that drop onto the stack
+    "..11111111..", ".11......11.", "..22222222..", ".22......22.",
+    "..33333333..", ".33......33.", "..44444444..", ".44......44.",
+    "..55555555..", ".55......55.", "..55555555..", "............",
+  ],
+  trophy: [   // the whole cup wobbles
+    "############", "#.########.#", "#.########.#", ".#.######.#.",
+    "..#.####.#..", "....####....", ".....##.....", ".....##.....",
+    "....####....", "...######...", "..########..", "............",
+  ],
+};
+export function tabIcon(name) {
+  const grid = TAB_GRIDS[name];
+  if (!grid) return icon(name);
+  const parts = {};
+  grid.forEach((row, y) => {
+    let x = 0;
+    while (x < row.length) {
+      const ch = row[x];
+      if (ch === ".") { x++; continue; }
+      let w = 1;
+      while (row[x + w] === ch) w++;
+      (parts[ch] ||= []).push(`<rect x="${x}" y="${y}" width="${w}" height="1"/>`);
+      x += w;
+    }
+  });
+  const groups = Object.entries(parts).map(([k, rects]) => `<g class="part" data-part="${k}">${rects.join("")}</g>`).join("");
+  const span = document.createElement("span");
+  span.innerHTML = `<svg class="pi tab-ic" data-icon="${name}" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true">${groups}</svg>`;
   return span.firstChild;
 }
 

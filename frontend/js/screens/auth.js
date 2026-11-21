@@ -12,7 +12,9 @@ import { shake } from "../fx.js";
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // ---------- Splash (plays once when the site loads, ~3.5s) ----------
-export async function playSplash(renderNext) {
+// greet: when you're already logged in, a promise for your name. Then the splash flows into
+// "Hi {name} 👋" and glides into Items, the same welcome as after logging in.
+export async function playSplash(renderNext, { greet = null } = {}) {
   const mark = logoMark("mark");
   const word = wordmark("", "splash-word");
   const tag = h("div", { class: "tag" }, "The room planner that knows prices go up.");
@@ -42,27 +44,47 @@ export async function playSplash(renderNext) {
   mark.animate([{ transform: "scale(.72)", opacity: 1 }, { transform: "scale(.6)", opacity: 0 }], { duration: 400, easing: "ease-in", fill: "forwards" });
   await tag.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 400, easing: "ease-in", fill: "forwards" }).finished;
 
-  // 5. Only the wordmark glides to its place at the top of Log in, shrinking to 40px,
-  //    "Fund" turns pink, and the Log in form fades in around it (wait 0.1s, 0.7s).
+  // The wordmark leaves the flex layout and becomes a fixed, top-left-anchored layer,
+  // so every glide below is one smooth transform (no jumps).
+  const start = word.getBoundingClientRect();
+  word.getAnimations().forEach((a) => a.cancel());
+  Object.assign(word.style, { position: "fixed", left: `${start.left}px`, top: `${start.top}px`, margin: "0", opacity: "1", transformOrigin: "top left", zIndex: "101" });
+  document.body.appendChild(word);
+  let at = "none";                                   // where the wordmark currently is (a transform)
+  const glide = (transform, ms = 700) => { const a = word.animate([{ transform: at }, { transform }], { duration: ms, easing: "ease-in-out", fill: "forwards" }); at = transform; return a.finished; };
+
+  if (greet) {
+    // Logged in already: wordmark glides to the centre and grows, "Hi {name} 👋" fades in, hold.
+    const name = await Promise.race([greet.catch(() => null), wait(1500).then(() => null)]);
+    const sc = 48.6 / 40;
+    const cx = window.innerWidth / 2 - (start.width * sc) / 2, cy = window.innerHeight / 2 - (start.height * sc) / 2 - 24;
+    await glide(`translate(${cx - start.left}px, ${cy - start.top}px) scale(${sc})`, 600);
+    const hi = h("div", { class: "hi", style: { position: "fixed", left: "0", right: "0", top: `${cy + start.height * sc + 16}px`, opacity: "0" } },
+      `Hi ${name || "there"} `, h("span", { class: "wave" }, "👋"));
+    splash.appendChild(hi);
+    await hi.animate([{ opacity: 0, transform: "translateY(8px)" }, { opacity: 1, transform: "none" }], { duration: 400, delay: 150, easing: "ease-out", fill: "forwards" }).finished;
+    await wait(800);
+    hi.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 300, fill: "forwards" });
+  }
+
+  // 5. Only the wordmark glides to its place (top of Log in, or the top-left of Items),
+  //    and the screen fades in around it (wait 0.1s, 0.7s).
   await renderNext();
   await wait(100);
   const target = document.querySelector(".auth .logo .wordmark") || document.querySelector(".header-wordmark");
   const screen = document.querySelector(".screen");
-  const from = word.getBoundingClientRect();
   if (target) {
     const to = target.getBoundingClientRect();
     target.style.visibility = "hidden";
-    if (target.closest(".auth")) word.classList.add("pink");
-    const scale = to.height / from.height;
-    word.animate([{ transform: "none" }, { transform: `translate(${to.left - from.left}px, ${to.top - from.top}px) scale(${scale})` }],
-      { duration: 700, easing: "ease-in-out", fill: "forwards" }).finished.then(() => {});
-    word.style.transformOrigin = "top left";
+    if (target.closest(".auth")) word.classList.add("pink");   // "Fund" turns pink on Log in
+    glide(`translate(${to.left - start.left}px, ${to.top - start.top}px) scale(${to.height / start.height})`);
   }
-  splash.animate([{ backgroundColor: getComputedStyle(splash).backgroundColor }, { backgroundColor: "transparent" }],
+  splash.animate([{ backgroundColor: getComputedStyle(splash).backgroundColor }, { backgroundColor: "rgba(0,0,0,0)" }],
     { duration: 700, easing: "ease-in-out", fill: "forwards" });
   screen?.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 700, easing: "ease-in-out" });
   await wait(720);
   if (target) target.style.visibility = "";
+  word.remove();
   splash.remove();
 }
 
@@ -170,8 +192,9 @@ export function loginScreen(ctx) {
     const b = banner(kind, msg);
     bannerSlot.replaceChildren(b);
     if (!reduceMotion()) {
+      // the form slides down to make room for the banner, then banner + form shake left/right
       form.animate([{ transform: "translateY(-33px)" }, { transform: "none" }], { duration: 200, easing: "ease-out" });
-      setTimeout(() => shake(b.firstChild), 200);
+      setTimeout(() => { shake(b.firstChild); shake(form); }, 200);
     }
   };
   if (ctx.query.expired) bannerSlot.appendChild(banner("info", "Your login expired, please log in again"));

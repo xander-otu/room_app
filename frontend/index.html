@@ -19,9 +19,7 @@
     try {
       var t = localStorage.getItem('rf_theme');
       if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t;
-      var rm = localStorage.getItem('rf_reduce_motion');
-      var sys = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
-      if (rm === '1' || (rm === null && sys)) document.documentElement.classList.add('reduce-motion');
+      if (localStorage.getItem('rf_reduce_motion') === '1') document.documentElement.classList.add('reduce-motion');
     } catch (e) {}
     // Any script error is also written into a hidden box (handy when testing).
     window.addEventListener('error', function (e) { var p = document.getElementById('rf-errors'); if (p) p.textContent += (e.message || e) + ' @' + (e.filename || '') + ':' + (e.lineno || '') + '\n'; });

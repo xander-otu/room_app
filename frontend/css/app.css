@@ -1,4 +1,4 @@
-/* =========================================================
+﻿/* =========================================================
    RoomFund styles. Section numbers = the v20 design PDF.
    1. Tokens (light + dark)   2. Accents   3. Base + fonts
    4. Pixel corners + shadow + press   5. Components
@@ -80,7 +80,7 @@ body {
   -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent;
   overscroll-behavior-y: none;
 }
-/* Tick wallpaper: a mask of small ticks, coloured by the pattern token (36×28 staggered grid). */
+/* Tick wallpaper: a mask of small ticks, coloured by the pattern token (36Ã—28 staggered grid). */
 body::before {
   content: ""; position: fixed; inset: 0; z-index: 0; pointer-events: none;
   background: var(--pattern);
@@ -94,7 +94,7 @@ img { display: block; max-width: 100%; }
 .f-word  { font-family: "Bitcount Grid Double", "Pixelify Sans", monospace; font-weight: 700; letter-spacing: .5px; }
 .f-pixel { font-family: "Pixelify Sans", monospace; }
 .f-head  { font-family: "Space Grotesk", "Inter", sans-serif; font-weight: 700; }
-.money, .num { font-family: "Inter", system-ui, sans-serif; }   /* pixel fonts can't draw ₦ (and their 5 looks like S) */
+.money, .num { font-family: "Inter", system-ui, sans-serif; }   /* pixel fonts can't draw â‚¦ (and their 5 looks like S) */
 .muted { color: var(--text-muted); }
 .caps { text-transform: uppercase; letter-spacing: .5px; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
@@ -110,43 +110,61 @@ img { display: block; max-width: 100%; }
    .pxw = the outside (carries the hard shadow, moves when pressed)
    .px  = the inside (clipped into a staircase; its ::before is the fill,
           its own background shows through as the border ring)
-   Custom props: --s step size, --b border width, --off shadow offset,
-                 --fill, --bd border colour, --sh shadow colour. */
-.pxw {
-  --s: 4px; --b: 2px; --off: 4px;
-  --fill: var(--surface); --bd: var(--border); --sh: var(--shadow);
-  position: relative; display: block;
-  filter: drop-shadow(var(--off) var(--off) 0 var(--sh));
-  transition: transform 80ms ease-out, filter 80ms ease-out;
-}
-.pxw.flat { filter: none; }
-.pxw.sm { --s: 3px; --off: 2px; }
-.pxw.xs { --s: 2px; --off: 2px; }
-.pxw.lg { --off: 6px; }
-.px {
+   Custom props: --s step size, --b border width, --off shadow offset (0 = no shadow),
+                 --fill, --bd border colour, --sh shadow colour.
+   Shape: --outer / --inner hold the clip polygons. Big things (cards, buttons, bars)
+   use a 3-step staircase; small things (chips, small buttons) use a 1-step notch (.st1).
+   The shadow is its OWN layer (.pxw::before, same shape, pushed by --off) instead of a
+   CSS filter: much lighter for slow laptops/phones to animate. */
+.pxw, .px {
   --s1: var(--s); --s2: calc(var(--s) * 2); --s3: calc(var(--s) * 3);
-  position: relative; isolation: isolate; display: block;
-  background: var(--bd);
-  clip-path: polygon(
+  --outer: polygon(
     0 var(--s3), var(--s1) var(--s3), var(--s1) var(--s2), var(--s2) var(--s2), var(--s2) var(--s1), var(--s3) var(--s1), var(--s3) 0,
     calc(100% - var(--s3)) 0, calc(100% - var(--s3)) var(--s1), calc(100% - var(--s2)) var(--s1), calc(100% - var(--s2)) var(--s2), calc(100% - var(--s1)) var(--s2), calc(100% - var(--s1)) var(--s3), 100% var(--s3),
     100% calc(100% - var(--s3)), calc(100% - var(--s1)) calc(100% - var(--s3)), calc(100% - var(--s1)) calc(100% - var(--s2)), calc(100% - var(--s2)) calc(100% - var(--s2)), calc(100% - var(--s2)) calc(100% - var(--s1)), calc(100% - var(--s3)) calc(100% - var(--s1)), calc(100% - var(--s3)) 100%,
     var(--s3) 100%, var(--s3) calc(100% - var(--s1)), var(--s2) calc(100% - var(--s1)), var(--s2) calc(100% - var(--s2)), var(--s1) calc(100% - var(--s2)), var(--s1) calc(100% - var(--s3)), 0 calc(100% - var(--s3)));
-}
-.px::before {
-  content: ""; position: absolute; inset: 0; z-index: -1; background: var(--fill);
-  clip-path: polygon(
+  --inner: polygon(
     var(--b) calc(var(--s3) + var(--b)), calc(var(--s1) + var(--b)) calc(var(--s3) + var(--b)), calc(var(--s1) + var(--b)) calc(var(--s2) + var(--b)), calc(var(--s2) + var(--b)) calc(var(--s2) + var(--b)), calc(var(--s2) + var(--b)) calc(var(--s1) + var(--b)), calc(var(--s3) + var(--b)) calc(var(--s1) + var(--b)), calc(var(--s3) + var(--b)) var(--b),
     calc(100% - var(--s3) - var(--b)) var(--b), calc(100% - var(--s3) - var(--b)) calc(var(--s1) + var(--b)), calc(100% - var(--s2) - var(--b)) calc(var(--s1) + var(--b)), calc(100% - var(--s2) - var(--b)) calc(var(--s2) + var(--b)), calc(100% - var(--s1) - var(--b)) calc(var(--s2) + var(--b)), calc(100% - var(--s1) - var(--b)) calc(var(--s3) + var(--b)), calc(100% - var(--b)) calc(var(--s3) + var(--b)),
     calc(100% - var(--b)) calc(100% - var(--s3) - var(--b)), calc(100% - var(--s1) - var(--b)) calc(100% - var(--s3) - var(--b)), calc(100% - var(--s1) - var(--b)) calc(100% - var(--s2) - var(--b)), calc(100% - var(--s2) - var(--b)) calc(100% - var(--s2) - var(--b)), calc(100% - var(--s2) - var(--b)) calc(100% - var(--s1) - var(--b)), calc(100% - var(--s3) - var(--b)) calc(100% - var(--s1) - var(--b)), calc(100% - var(--s3) - var(--b)) calc(100% - var(--b)),
     calc(var(--s3) + var(--b)) calc(100% - var(--b)), calc(var(--s3) + var(--b)) calc(100% - var(--s1) - var(--b)), calc(var(--s2) + var(--b)) calc(100% - var(--s1) - var(--b)), calc(var(--s2) + var(--b)) calc(100% - var(--s2) - var(--b)), calc(var(--s1) + var(--b)) calc(100% - var(--s2) - var(--b)), calc(var(--s1) + var(--b)) calc(100% - var(--s3) - var(--b)), var(--b) calc(100% - var(--s3) - var(--b)));
 }
+/* 1-step notch (chips, small buttons, banners, badges in lists) */
+.st1, .st1 > .px, .chip, .chip > .px, .banner, .banner > .px, .btn.small, .btn.small > .px, .qd, .qd > .px, .verdict-badge, .verdict-badge > .px {
+  --outer: polygon(0 var(--s), var(--s) var(--s), var(--s) 0, calc(100% - var(--s)) 0, calc(100% - var(--s)) var(--s), 100% var(--s),
+    100% calc(100% - var(--s)), calc(100% - var(--s)) calc(100% - var(--s)), calc(100% - var(--s)) 100%, var(--s) 100%, var(--s) calc(100% - var(--s)), 0 calc(100% - var(--s)));
+  --inner: polygon(var(--b) calc(var(--s) + var(--b)), calc(var(--s) + var(--b)) calc(var(--s) + var(--b)), calc(var(--s) + var(--b)) var(--b),
+    calc(100% - var(--s) - var(--b)) var(--b), calc(100% - var(--s) - var(--b)) calc(var(--s) + var(--b)), calc(100% - var(--b)) calc(var(--s) + var(--b)),
+    calc(100% - var(--b)) calc(100% - var(--s) - var(--b)), calc(100% - var(--s) - var(--b)) calc(100% - var(--s) - var(--b)), calc(100% - var(--s) - var(--b)) calc(100% - var(--b)),
+    calc(var(--s) + var(--b)) calc(100% - var(--b)), calc(var(--s) + var(--b)) calc(100% - var(--s) - var(--b)), var(--b) calc(100% - var(--s) - var(--b)));
+}
+.pxw {
+  --s: 4px; --b: 2px; --off: 4px;
+  --fill: var(--surface); --bd: var(--border); --sh: var(--shadow);
+  position: relative; display: block; isolation: isolate;
+}
+/* the hard shadow: same shape, pushed right/down by --off, behind everything */
+.pxw::before {
+  content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background: var(--sh); clip-path: var(--outer);
+  transform: translate(var(--off), var(--off));
+}
+.pxw.flat { --off: 0px; }
+.pxw.sm { --s: 3px; --off: 2px; }
+.pxw.xs { --s: 2px; --off: 2px; }
+.pxw.lg { --off: 6px; }
+.px { position: relative; isolation: isolate; display: block; background: var(--bd); clip-path: var(--outer); }
+.px::before { content: ""; position: absolute; inset: 0; z-index: -1; background: var(--fill); clip-path: var(--inner); }
 
-/* The ONE shared press effect for everything tappable (Section 5):
-   shadow disappears and the element moves by its shadow offset, 80ms. */
-.press { cursor: pointer; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
-.press.pxw:active, .press.pxw.pressed { transform: translate(var(--off), var(--off)); filter: none; }
-.press:not(.pxw):active, .press:not(.pxw).pressed { transform: translateY(2px); opacity: .85; }
+/* The ONE shared press effect for everything tappable (Section 5), made bouncy:
+   pressing (80ms) pushes it down into its shadow and squishes it a little;
+   letting go springs it back with an overshoot, like a rubber arcade button. */
+.press { cursor: pointer; user-select: none; -webkit-user-select: none; touch-action: manipulation;
+  transition: transform 420ms cubic-bezier(.3, 1.9, .45, 1), opacity 200ms; }
+.press.pxw::before { transition: transform 420ms cubic-bezier(.3, 1.9, .45, 1); }
+.press.pxw:active, .press.pxw.pressed { transform: translate(var(--off), var(--off)) scale(.96); transition: transform 80ms ease-out; }
+.press.pxw:active::before, .press.pxw.pressed::before { transform: translate(0, 0); transition: transform 80ms ease-out; }
+.press:not(.pxw):active, .press:not(.pxw).pressed { transform: translateY(2px) scale(.94); opacity: .85; transition: transform 80ms ease-out; }
 a.press:active, .link.press:active { transform: none; opacity: 1; text-decoration-thickness: 3px; }
 .press:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
 .row-press:active { opacity: .6; }
@@ -163,7 +181,7 @@ a.press:active, .link.press:active { transform: none; opacity: 1; text-decoratio
 .btn.danger > .px { color: var(--ink); }
 .btn.money { --fill: var(--money); }
 .btn.money > .px { color: #fff; }
-.btn[disabled] { --fill: var(--muted); filter: none; cursor: default; }
+.btn[disabled] { --fill: var(--muted); --off: 0px; cursor: default; }
 .btn[disabled] > .px { color: var(--text-muted); }
 .btn.loading { opacity: .7; pointer-events: none; }
 .btn-row { display: flex; gap: 12px; }
@@ -171,12 +189,12 @@ a.press:active, .link.press:active { transform: none; opacity: 1; text-decoratio
 .btn.small > .px { min-height: 36px; font-size: 13px; padding: 0 12px; }
 .btn.auto { width: auto; }
 
-/* Icon buttons (44×44) */
+/* Icon buttons (44Ã—44) */
 .icon-btn { width: 44px; height: 44px; flex: none; --s: 3px; --off: 3px; }
 .icon-btn > .px { width: 100%; height: 100%; display: grid; place-items: center; color: var(--text); }
 .icon-btn.accent { --fill: var(--accent); }
 .icon-btn.accent > .px { color: var(--accent-on); }
-.icon-btn.ghost { --fill: rgba(255,255,255,.18); --bd: #fff; filter: none; }
+.icon-btn.ghost { --fill: rgba(255,255,255,.18); --bd: #fff; --sh: transparent; --off: 0px; }
 .icon-btn.ghost > .px { color: #fff; }
 .pi { width: 20px; height: 20px; display: block; shape-rendering: crispEdges; flex: none; }
 .pi.sm { width: 14px; height: 14px; }
@@ -209,7 +227,7 @@ a.press:active, .link.press:active { transform: none; opacity: 1; text-decoratio
 input[type="date"] { font-family: "Inter", sans-serif !important; }
 
 /* Banner: compact pill that hugs its message (Section 4) */
-.banner { display: inline-flex; max-width: 100%; margin: 0 auto 16px; --s: 3px; --off: 0px; filter: none; }
+.banner { display: inline-flex; max-width: 100%; margin: 0 auto 16px; --s: 3px; --off: 0px; }
 .banner > .px { display: flex; align-items: center; gap: 8px; min-height: 33px; padding: 6px 12px;
   font-family: "Pixelify Sans", monospace; font-size: 13px; color: var(--ink); }
 .banner.error { --fill: #FFD6D6; --bd: var(--danger); }
@@ -220,8 +238,8 @@ input[type="date"] { font-family: "Inter", sans-serif !important; }
 .chip { display: inline-flex; --s: 2px; --off: 2px; }
 .chip > .px { display: flex; align-items: center; gap: 6px; padding: 4px 8px; min-height: 24px;
   font-family: "Space Grotesk", sans-serif; font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--text); }
-.chip.flat { filter: none; }
-.chip .dot { width: 8px; height: 8px; background: var(--ink); }
+.chip.flat { --off: 0px; }
+.chip .dot { width: 8px; height: 8px; background: var(--ink); border-radius: 50%; }
 .chip.status > .px, .chip.fixed > .px { color: var(--ink); }
 .chip.wanted { --fill: var(--wanted); }
 .chip.saving { --fill: var(--saving); }
@@ -257,7 +275,7 @@ input[type="date"] { font-family: "Inter", sans-serif !important; }
 .pixel-text { font-family: "Pixelify Sans", monospace; font-size: 14px; }
 .pixel-text.sm { font-size: 12px; }
 
-/* Floating header (Section 4): wordmark · accent title bar · settings button */
+/* Floating header (Section 4): wordmark Â· accent title bar Â· settings button */
 .topbar { position: fixed; z-index: 30; top: 16px; left: 50%; transform: translateX(-50%);
   width: min(100%, 480px); padding: 0 16px; display: flex; align-items: center; gap: 12px; pointer-events: none; }
 .topbar > * { pointer-events: auto; }
@@ -279,15 +297,19 @@ input[type="date"] { font-family: "Inter", sans-serif !important; }
 .tabbar { position: fixed; z-index: 30; bottom: 24px; left: 50%; transform: translateX(-50%);
   width: min(calc(100% - 32px), 343px); }
 .tabbar > .px { height: 60px; display: flex; align-items: center; padding: 0 6px; gap: 2px; }
-.tab { flex: 1; height: 48px; position: relative; --fill: transparent; --bd: transparent; filter: none; }
+.tab { flex: 1; height: 48px; position: relative; --fill: transparent; --bd: transparent; --sh: transparent; --off: 0px; }
 .tab > .px { height: 100%; }
 .tab .tab-inner { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
   font-family: "Space Grotesk", sans-serif; font-weight: 700; font-size: 9.5px; text-transform: uppercase; letter-spacing: .3px; color: var(--text-muted); }
-.tab.active { --s: 2px; --off: 2px; --fill: var(--accent); --bd: var(--border); filter: drop-shadow(2px 2px 0 var(--shadow)); }
-.tab.press.pxw:active { transform: translateY(2px); filter: none; opacity: .8; }
+.tab.active { --s: 2px; --off: 2px; --fill: var(--accent); --bd: var(--border); --sh: var(--shadow); }
+.tab-ic { overflow: visible; }
+.tab-ic, .tab-ic .part { transform-box: fill-box; transform-origin: center; }
+.tab-ic[data-icon="list"] .part:not([data-part="D"]) { transform-origin: left center; }
+.tab-ic[data-icon="trophy"] { transform-origin: 50% 90%; }
+.tab.press.pxw:active { transform: translateY(2px) scale(.88); }
 .tab.active .tab-inner { color: var(--accent-on); }
 .tab:not(.pxw):active { transform: translateY(2px); opacity: .7; }
-.tabbar.preview { position: static; transform: none; width: 100%; filter: drop-shadow(3px 3px 0 var(--shadow)); }
+.tabbar.preview { position: relative; left: auto; bottom: auto; transform: none; width: 100%; --off: 3px; }
 .tabbar.preview > .px { height: 54px; }
 .tabbar.preview .tab { pointer-events: none; height: 42px; }
 
@@ -331,20 +353,23 @@ button.card, .card.press { width: 100%; text-align: left; }
 .pbar .lbl { font-family: "Space Grotesk", sans-serif; font-size: 16px; font-weight: 700; }
 .pbar .pct { font-family: "Space Grotesk", sans-serif; font-weight: 700; font-size: 18px; }
 .pbar .track { --s: 3px; --off: 3px; }
-.pbar .track > .px { padding: 6px 8px; }
-.pbar .blocks { display: flex; gap: 3px; height: 14px; }
-.pbar .blk { flex: 1; background: var(--muted); }
+.pbar .track > .px { padding: 6px 12px; }
+.pbar .blocks { display: flex; justify-content: space-between; gap: 3px; height: 14px; }
+.pbar .blk { flex: 0 0 16px; width: 16px; height: 14px; background: var(--muted); transform-origin: bottom; }
 .pbar .blk.on { background: var(--accent); }
 .pbar .under { font-family: "Pixelify Sans", monospace; font-size: 13px; color: var(--text-muted); margin-top: 8px; }
 .pbar.full .blk.on { background: var(--bought); }
 .pbar.full .pct, .pbar.full .ready { color: var(--money-text); }
 .pbar .ready { font-family: "Space Grotesk", sans-serif; font-weight: 700; font-size: 14px; margin-top: 6px; }
 
-/* Toggle switch (56×32, 120ms) */
-.toggle { width: 56px; height: 32px; flex: none; --s: 2px; --off: 2px; --fill: var(--muted); }
+/* Toggle switch (56Ã—32, 120ms) */
+.toggle { width: 56px; height: 32px; flex: none; --s: 3px; --off: 2px; --fill: var(--muted); }
 .toggle > .px { width: 100%; height: 100%; }
-.toggle .knob { position: absolute; top: 5px; left: 5px; width: 22px; height: 22px; background: var(--surface);
-  border: 2px solid var(--ink); transition: transform 120ms ease-out; }
+/* the knob is its own little pixel shape (stepped corners + ink outline), like the track */
+.toggle .knob { position: absolute; top: 5px; left: 5px; width: 22px; height: 22px; z-index: 1;
+  --s: 2px; --b: 2px; --off: 0px; --fill: #FFFFFF; --bd: var(--ink);
+  transition: transform 220ms cubic-bezier(.3, 1.6, .5, 1); }
+.toggle .knob > .px { width: 100%; height: 100%; }
 .toggle.on { --fill: var(--money); }
 .toggle.on .knob { transform: translateX(24px); }
 .toggle[disabled] { opacity: .4; pointer-events: none; }
@@ -363,7 +388,7 @@ button.card, .card.press { width: 100%; text-align: left; }
 .set-block.disabled .head, .set-block.disabled .hint { opacity: .4; }
 .seg { display: flex; gap: 8px; margin-top: 10px; }
 .seg .btn > .px { min-height: 40px; font-size: 14px; padding: 0 6px; }
-.seg .btn:not(.on) { filter: none; }
+.seg .btn:not(.on) { --off: 0px; }
 .seg .btn.on { --fill: var(--accent); }
 .seg .btn.on > .px { color: var(--accent-on); }
 
@@ -376,7 +401,7 @@ button.card, .card.press { width: 100%; text-align: left; }
 .modal .lead, .sheet .lead { font-family: "Pixelify Sans", monospace; font-size: 14px; color: var(--text-muted); margin: 0 0 16px; }
 .modal .icon-top { display: grid; place-items: center; margin-bottom: 12px; }
 .modal .btn + .btn, .sheet .btn + .btn { margin-top: 12px; }
-.sheet { width: min(100%, 480px); filter: drop-shadow(0 -4px 0 var(--shadow)); }
+.sheet { width: min(100%, 480px); --off: 0px; filter: drop-shadow(0 -4px 0 var(--shadow)); }
 .sheet > .px { padding: 20px 16px calc(24px + env(safe-area-inset-bottom)); max-height: 88vh; overflow: auto;
   clip-path: polygon(0 12px, 4px 12px, 4px 8px, 8px 8px, 8px 4px, 12px 4px, 12px 0, calc(100% - 12px) 0, calc(100% - 12px) 4px, calc(100% - 8px) 4px, calc(100% - 8px) 8px, calc(100% - 4px) 8px, calc(100% - 4px) 12px, 100% 12px, 100% 100%, 0 100%); }
 .sheet .px::before { clip-path: polygon(2px 14px, 6px 14px, 6px 10px, 10px 10px, 10px 6px, 14px 6px, 14px 2px, calc(100% - 14px) 2px, calc(100% - 14px) 6px, calc(100% - 10px) 6px, calc(100% - 10px) 10px, calc(100% - 6px) 10px, calc(100% - 6px) 14px, calc(100% - 2px) 14px, calc(100% - 2px) 100%, 2px 100%); }
@@ -524,7 +549,7 @@ button.card, .card.press { width: 100%; text-align: left; }
 .badge > .px { padding: 14px 8px; min-height: 150px; display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; }
 .badge .nm { font-family: "Pixelify Sans", monospace; font-weight: 700; font-size: 13px; }
 .badge .ds { font-family: "Pixelify Sans", monospace; font-size: 11px; color: var(--text-muted); }
-.badge.locked { opacity: .75; filter: none; }
+.badge.locked { opacity: .75; --off: 0px; }
 .room-card { --fill: var(--soft-lilac); }
 .room-card .head { display: flex; gap: 12px; align-items: center; margin-bottom: 12px; }
 .room-card .ic { width: 48px; height: 48px; display: grid; place-items: center; background: var(--accent); border: 2px solid var(--ink); color: var(--ink); }
@@ -560,7 +585,7 @@ button.card, .card.press { width: 100%; text-align: left; }
 .qd.on .w, .qd.on .d { color: var(--accent-on); }
 
 /* Choice chips: unselected ones are flat; the selected one gets a 3px border + hard shadow. */
-.chips[role="radiogroup"] .chip:not(.on) { filter: none; }
+.chips[role="radiogroup"] .chip:not(.on) { --off: 0px; }
 .chips[role="radiogroup"] .chip > .px { padding: 8px 14px; font-size: 13px; text-transform: none; letter-spacing: 0; }
 .chip.pick.on { --fill: var(--muted); }
 .chip.pick.on > .px { color: var(--text); }

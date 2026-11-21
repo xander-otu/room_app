@@ -12,7 +12,7 @@ const FREQ = { weekly: "Weekly", biweekly: "Every 2 weeks", monthly: "Monthly", 
 
 // Toggle switch: 56×32 pixel track, money green when on, 120ms slide.
 function toggle(on, onChange, { disabled = false, label = "" } = {}) {
-  const t = px("button", `toggle press ${on ? "on" : ""}`, [h("span", { class: "knob" })],
+  const t = px("button", `toggle press ${on ? "on" : ""}`, [px("span", "knob", [])],
     { type: "button", role: "switch", "aria-checked": String(on), "aria-label": label, disabled });
   t.addEventListener("click", () => {
     on = !on;
@@ -113,7 +113,7 @@ export function settingsScreen(ctx) {
       ]),
       h("div", { class: "section-label" }, "Feel"),
       card([
-        block("Reduce motion", motionToggle, "Fewer animations: no splash, shake or stamp slam. Starts the same as your phone’s setting."),
+        block("Reduce motion", motionToggle, "Fewer animations: no splash, shake or stamp slam."),
         block("Haptics", hapticsToggle, hapticsHint, vib ? "" : "disabled"),
       ]),
       h("div", { class: "section-label" }, "Bottom bar"),

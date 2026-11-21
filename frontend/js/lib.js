@@ -126,12 +126,12 @@ export const prefs = {
   set(key, value) { try { value === null ? localStorage.removeItem(key) : localStorage.setItem(key, value); } catch {} },
 };
 
-// Reduce motion (Section 23): the phone's setting until the user flips the in-app toggle.
+// Reduce motion (Section 23). Changed on request: animations are ON by default, even when
+// the device says "reduce motion" (Windows' "Animation effects: off" switched every animation
+// off). Only the in-app toggle (Settings → Feel) turns them off.
 export function reduceMotion() { return document.documentElement.classList.contains("reduce-motion"); }
 export function applyReduceMotion() {
-  const saved = prefs.get("rf_reduce_motion");
-  const sys = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-  document.documentElement.classList.toggle("reduce-motion", saved === null ? !!sys : saved === "1");
+  document.documentElement.classList.toggle("reduce-motion", prefs.get("rf_reduce_motion") === "1");
 }
 export function applyTheme() {
   const t = prefs.get("rf_theme", "system");

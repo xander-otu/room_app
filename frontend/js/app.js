@@ -6,7 +6,7 @@
 //   - the floating header + floating tab bar (Section 4)
 // ---------------------------------------------------------
 import { h, px, iconButton, store, auth, api, prefs, reduceMotion, applyReduceMotion, applyTheme, setLoggedOutHandler, iso, today } from "./lib.js";
-import { icon } from "./icons.js";
+import { icon, tabIcon } from "./icons.js";
 import * as A from "./screens/auth.js";
 import * as I from "./screens/items.js";
 import * as F from "./screens/itemform.js";
@@ -17,7 +17,7 @@ import * as P from "./screens/progress.js";
 import * as G from "./screens/settings.js";
 import * as R from "./screens/room.js";
 import { paydayCheckin } from "./screens/popups.js";
-import { showBadges } from "./fx.js";
+import { showBadges, animateTabIcon } from "./fx.js";
 
 const appEl = document.getElementById("app");
 
@@ -120,19 +120,28 @@ export function tabBar(active, showRoom, preview = false) {
     const tab = h("button", {
       class: `tab press pxw ${on ? "active" : ""}`, type: "button", "aria-current": on ? "page" : null,
       onclick: preview ? null : () => { if (!on) go(path, "none"); },     // tab switches are instant
-    }, h("span", { class: "px" }, h("span", { class: "tab-inner" }, icon(ic), label)));
+    }, h("span", { class: "px" }, h("span", { class: "tab-inner" }, tabIcon(ic), label)));
     return tab;
   }), { "aria-label": "Main" });
   bar.dataset.accent = ({ items: "items", timeline: "timeline", room: "room", savings: "savings", progress: "progress" })[active] || "items";
   return bar;
 }
 let tabbarEl = null;
+let lastTab = null;
 function updateTabbar(tab) {
   tabbarEl?.remove();
   tabbarEl = null;
-  if (!tab) return;
+  if (!tab) { lastTab = null; return; }
   tabbarEl = tabBar(tab, !!store.settings?.show_room_tab);
   document.body.appendChild(tabbarEl);
+  if (tab !== lastTab && !reduceMotion()) {
+    // the new tab's pill pops in with a bounce, and its icon plays its little animation
+    const active = tabbarEl.querySelector(".tab.active");
+    active?.animate([{ transform: "scale(.8)" }, { transform: "scale(1.1)", offset: .55 }, { transform: "scale(.97)", offset: .8 }, { transform: "none" }],
+      { duration: 420, easing: "ease-out" });
+    animateTabIcon(active?.querySelector(".tab-ic"));
+  }
+  lastTab = tab;
 }
 // Settings calls this when "Show My Room tab" flips, so the real bar updates straight away.
 export function refreshTabbar() { if (tabbarEl) updateTabbar(current?.tab); }
@@ -218,7 +227,6 @@ export async function afterLogin() {
 // ---------- Start ----------
 applyTheme();
 applyReduceMotion();
-window.matchMedia?.("(prefers-reduced-motion: reduce)").addEventListener?.("change", applyReduceMotion);
 
 (async function start() {
   const { path } = parseHash();
@@ -227,8 +235,10 @@ window.matchMedia?.("(prefers-reduced-motion: reduce)").addEventListener?.("chan
     history.replaceState(null, "", auth.token ? "#/items" : "#/login");
   }
   // Splash plays once when the site loads (Section 5), unless Reduce motion is on.
+  // When you're already logged in, the splash ends with the "Hi {name} 👋" welcome.
   if (!reduceMotion() && !["/reset", "/password-changed"].includes(parseHash().path)) {
-    await A.playSplash(() => show("none"));
+    const greet = auth.token && !firstPublic ? store.loadMe().then((me) => me.name) : null;
+    await A.playSplash(() => show("none"), { greet });
   } else {
     await show("none");
   }

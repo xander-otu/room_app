@@ -114,6 +114,39 @@ function showOne(b) {
   });
 }
 
+// ---------- Tab icon animations (play when a tab becomes active) ----------
+export function animateTabIcon(svg) {
+  if (!svg || reduceMotion()) return;
+  const part = (k) => svg.querySelector(`[data-part="${k}"]`);
+  const springy = "cubic-bezier(.3, 1.7, .5, 1)";
+  switch (svg.dataset.icon) {
+    case "list":        // the long dashes shoot out of the dots
+      part("D")?.animate([{ transform: "scale(.4)" }, { transform: "scale(1.2)" }, { transform: "none" }], { duration: 300, easing: "ease-out" });
+      ["A", "B", "C"].forEach((k, i) => part(k)?.animate([{ transform: "scaleX(0)" }, { transform: "scaleX(1.15)", offset: .75 }, { transform: "none" }],
+        { duration: 380, delay: 60 + i * 70, easing: "ease-out", fill: "backwards" }));
+      break;
+    case "calendar":    // the dates disappear, then appear again one by one
+      ["1", "2", "3", "4", "5", "6"].forEach((k, i) => part(k)?.animate(
+        [{ opacity: 1 }, { opacity: 0, offset: .3 }, { opacity: 0, offset: .55 }, { opacity: 1 }],
+        { duration: 520, delay: i * 55, easing: "steps(4, end)" }));
+      break;
+    case "floor":       // the furniture pops into the room
+      ["1", "2", "3", "4"].forEach((k, i) => part(k)?.animate([{ transform: "scale(0)" }, { transform: "scale(1.5)", offset: .6 }, { transform: "none" }],
+        { duration: 380, delay: i * 80, easing: "ease-out", fill: "backwards" }));
+      svg.animate([{ transform: "none" }, { transform: "translateY(-2px)" }, { transform: "none" }], { duration: 300, delay: 320, easing: springy });
+      break;
+    case "coins":       // the coins drop from above and land on the stack, bottom one first
+      ["5", "4", "3", "2", "1"].forEach((k, i) => part(k)?.animate(
+        [{ transform: "translateY(-14px)", opacity: 0 }, { transform: "translateY(0)", opacity: 1, offset: .65 }, { transform: "translateY(-1.5px)", offset: .82 }, { transform: "none", opacity: 1 }],
+        { duration: 420, delay: i * 80, easing: "ease-in", fill: "backwards" }));
+      break;
+    case "trophy":      // the trophy shakes, then settles
+      svg.animate([{ transform: "rotate(0)" }, { transform: "rotate(-18deg)" }, { transform: "rotate(14deg)" }, { transform: "rotate(-9deg)" },
+        { transform: "rotate(5deg)" }, { transform: "rotate(-2deg)" }, { transform: "rotate(0)" }], { duration: 650, easing: "ease-out" });
+      break;
+  }
+}
+
 // ---------- The BOUGHT stamp (Section 22) ----------
 
 // Big stamp on the item page photo: slam, jolt, bits, settle.
@@ -169,5 +202,8 @@ export function stampItemCard(card) {
   stamp.animate([
     { transform: "scale(2.2) rotate(-35deg)", opacity: 0 },
     { transform: "scale(1) rotate(-10deg)", opacity: 1 },
-  ], { duration: 220, delay: 250, easing: "ease-in", fill: "both" }).finished.then(() => haptic("thud")).catch(() => {});
+  ], { duration: 220, delay: 550, easing: "ease-in", fill: "both" }).finished.then(() => {     // after the back-slide (280ms) + the 250ms pause
+    haptic("thud");
+    card.animate([{ transform: "translate(1px, 3px)" }, { transform: "none" }], { duration: 220, easing: "ease-out" });   // the card takes the hit
+  }).catch(() => {});
 }
