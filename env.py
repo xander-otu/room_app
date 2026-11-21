@@ -11,9 +11,13 @@ def load_env_file(path=".env"):
     if os.path.exists(path):
         with open(path) as f:                       # with: opens the file and closes it when done
             for line in f:
+                line = line.strip()
                 if "=" in line and not line.startswith("#"):
-                    name, value = line.strip().split("=", 1)   # split at the FIRST "=" only
-                    os.environ.setdefault(name, value)         # a real setting always wins over the file
+                    name, value = line.split("=", 1)           # split at the FIRST "=" only
+                    name = name.strip()                        # allow "NAME = value" (spaces around =)
+                    value = value.strip().strip('"').strip("'")   # allow quotes: NAME="value"
+                    if name:
+                        os.environ.setdefault(name, value)     # a real setting always wins over the file
 
 
 load_env_file()
