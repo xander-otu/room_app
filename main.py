@@ -1072,5 +1072,6 @@ def remove_room(db: Session = Depends(get_db), user: User = Depends(get_current_
 # Mounted LAST, so every API route above is matched first.
 # /uploads → item photos; / → the frontend folder (index.html, css, js).
 app.mount("/uploads", StaticFiles(directory=UPLOADS_DIR), name="uploads")
-if os.path.isdir("frontend"):
-    app.mount("/", StaticFiles(directory="frontend", html=True), name="frontend")
+FRONTEND_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "frontend")   # next to main.py
+if os.path.isdir(FRONTEND_DIR):
+    app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")

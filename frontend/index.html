@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>RoomFund</title>
+  <meta name="description" content="The room planner that knows prices go up.">
+  <meta name="theme-color" content="#F5F0E6" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#141414" media="(prefers-color-scheme: dark)">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' shape-rendering='crispEdges'%3E%3Crect width='16' height='16' fill='%23FF7AC6'/%3E%3Cpath d='M3 8h2v2h2v-2h2v-2h2v-2h2v2h-2v2h-2v2h-2v2h-2v-2h-2z' fill='%23111'/%3E%3C/svg%3E">
+  <!-- Fonts (Section 3): Bitcount Grid Double (wordmark), Pixelify Sans, Space Grotesk, Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bitcount+Grid+Double:wght@700&family=Inter:wght@400;600;700&family=Pixelify+Sans:wght@400;700&family=Space+Grotesk:wght@700&display=swap">
+  <link rel="stylesheet" href="/css/app.css">
+  <script>
+    // Apply the saved Appearance + Reduce motion + List size BEFORE the page draws,
+    // so there's no flash of the wrong theme.
+    try {
+      var t = localStorage.getItem('rf_theme');
+      if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t;
+      var rm = localStorage.getItem('rf_reduce_motion');
+      var sys = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (rm === '1' || (rm === null && sys)) document.documentElement.classList.add('reduce-motion');
+    } catch (e) {}
+    // Any script error is also written into a hidden box (handy when testing).
+    window.addEventListener('error', function (e) { var p = document.getElementById('rf-errors'); if (p) p.textContent += (e.message || e) + ' @' + (e.filename || '') + ':' + (e.lineno || '') + '\n'; });
+    window.addEventListener('unhandledrejection', function (e) { var p = document.getElementById('rf-errors'); if (p) p.textContent += 'Promise: ' + (e.reason && (e.reason.stack || e.reason.message) || e.reason) + '\n'; });
+  </script>
+</head>
+<body>
+  <div id="app" class="density-moderate"></div>
+  <pre id="rf-errors" hidden></pre>
+  <script type="module" src="/js/app.js"></script>
+</body>
+</html>
