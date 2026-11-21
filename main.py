@@ -1069,6 +1069,16 @@ def remove_room(db: Session = Depends(get_db), user: User = Depends(get_current_
 
 
 # --- The web page ---
+# Tell browsers to always check for a newer copy of the page's files (html/css/js/svg).
+# Without this, a normal reload can quietly reuse OLD scripts from the browser's cache.
+@app.middleware("http")
+async def no_stale_page_files(request: Request, call_next):
+    response = await call_next(request)
+    path = request.url.path
+    if path == "/" or path.endswith((".html", ".js", ".css", ".svg")):
+        response.headers["Cache-Control"] = "no-cache"   # "you may keep it, but ask me first"
+    return response
+
 # Mounted LAST, so every API route above is matched first.
 # /uploads → item photos; / → the frontend folder (index.html, css, js).
 app.mount("/uploads", StaticFiles(directory=UPLOADS_DIR), name="uploads")

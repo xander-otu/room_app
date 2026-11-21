@@ -15,6 +15,8 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 // greet: when you're already logged in, a promise for your name. Then the splash flows into
 // "Hi {name} 👋" and glides into Items, the same welcome as after logging in.
 export async function playSplash(renderNext, { greet = null } = {}) {
+  const note = (step) => (window.__rfSplash ||= []).push(step);   // a tiny log of the steps (handy for testing)
+  note("start");
   const mark = logoMark("mark");
   const word = wordmark("", "splash-word");
   const tag = h("div", { class: "tag" }, "The room planner that knows prices go up.");
@@ -47,8 +49,10 @@ export async function playSplash(renderNext, { greet = null } = {}) {
   // The wordmark leaves the flex layout and becomes a fixed, top-left-anchored layer,
   // so every glide below is one smooth transform (no jumps).
   const start = word.getBoundingClientRect();
+  const fontSize = getComputedStyle(word).fontSize;    // lock the 40px size: outside the splash box it would shrink
   word.getAnimations().forEach((a) => a.cancel());
-  Object.assign(word.style, { position: "fixed", left: `${start.left}px`, top: `${start.top}px`, margin: "0", opacity: "1", transformOrigin: "top left", zIndex: "101" });
+  Object.assign(word.style, { position: "fixed", left: `${start.left}px`, top: `${start.top}px`, margin: "0", opacity: "1",
+    transformOrigin: "top left", zIndex: "101", fontSize, lineHeight: "1" });
   document.body.appendChild(word);
   let at = "none";                                   // where the wordmark currently is (a transform)
   const glide = (transform, ms = 700) => { const a = word.animate([{ transform: at }, { transform }], { duration: ms, easing: "ease-in-out", fill: "forwards" }); at = transform; return a.finished; };
@@ -56,6 +60,7 @@ export async function playSplash(renderNext, { greet = null } = {}) {
   if (greet) {
     // Logged in already: wordmark glides to the centre and grows, "Hi {name} 👋" fades in, hold.
     const name = await Promise.race([greet.catch(() => null), wait(1500).then(() => null)]);
+    note(`hi ${name}`);
     const sc = 48.6 / 40;
     const cx = window.innerWidth / 2 - (start.width * sc) / 2, cy = window.innerHeight / 2 - (start.height * sc) / 2 - 24;
     await glide(`translate(${cx - start.left}px, ${cy - start.top}px) scale(${sc})`, 600);
@@ -67,6 +72,7 @@ export async function playSplash(renderNext, { greet = null } = {}) {
     hi.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 300, fill: "forwards" });
   }
 
+  note("glide");
   // 5. Only the wordmark glides to its place (top of Log in, or the top-left of Items),
   //    and the screen fades in around it (wait 0.1s, 0.7s).
   await renderNext();
@@ -86,6 +92,7 @@ export async function playSplash(renderNext, { greet = null } = {}) {
   if (target) target.style.visibility = "";
   word.remove();
   splash.remove();
+  note("done");
 }
 
 // ---------- Logged-in greeting (7A) ----------

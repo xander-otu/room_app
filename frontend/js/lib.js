@@ -223,7 +223,7 @@ export function countUp(el, to, format = naira, ms = 650) {
   if (reduceMotion() || !to) { el.textContent = format(to); return; }
   const start = performance.now();
   const tick = (now) => {
-    const t = Math.min(1, (now - start) / ms);
+    const t = Math.max(0, Math.min(1, (now - start) / ms));   // frame times can be a hair earlier than start: never below 0
     const eased = 1 - Math.pow(1 - t, 3);                  // fast at first, then slows down
     el.textContent = format(Math.round(to * eased));
     if (t < 1) requestAnimationFrame(tick);

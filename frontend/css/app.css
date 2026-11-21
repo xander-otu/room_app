@@ -505,7 +505,7 @@ button.card, .card.press { width: 100%; text-align: left; }
 .splash .tag { font-family: "Pixelify Sans", monospace; font-size: 16px; color: var(--text-muted); }
 .greeting { position: fixed; inset: 0; z-index: 90; background: var(--page); display: grid; place-items: center; }
 .greeting .wordmark { font-size: 48.6px; }
-.greeting .hi { font-family: "Pixelify Sans", monospace; font-weight: 700; font-size: 22px; text-align: center; margin-top: 16px; }
+.hi { font-family: "Pixelify Sans", monospace; font-weight: 700; font-size: 22px; text-align: center; color: var(--text); }   /* "Hi Xander 👋" (after login AND on every start) */
 
 /* Item detail */
 .hero { margin-bottom: 20px; position: relative; }
