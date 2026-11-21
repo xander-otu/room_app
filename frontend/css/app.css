@@ -647,6 +647,9 @@ button.card, .card.press { width: 100%; text-align: left; }
 .size-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .size-grid .field-label { font-size: 13px; }
 
+/* The app icon in the "Install RoomFund" pop-up */
+.install-icon { border: 2px solid var(--ink); box-shadow: 4px 4px 0 var(--shadow); }
+
 /* Header wordmark (shared-element target for the greeting glide) */
 .header-wordmark { font-size: 22px; }
 

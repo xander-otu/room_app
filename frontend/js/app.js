@@ -18,6 +18,7 @@ import * as G from "./screens/settings.js";
 import * as R from "./screens/room.js";
 import { paydayCheckin } from "./screens/popups.js";
 import { showBadges, animateTabIcon } from "./fx.js";
+import { adviseInstall } from "./install.js";
 
 const appEl = document.getElementById("app");
 
@@ -239,7 +240,8 @@ setLoggedOutHandler((expired) => {
 
 // ---------- After logging in (and on start when already logged in) ----------
 // Ask about a due payday (Section 7F), unless "Remind me tomorrow" was chosen today.
-export async function afterLogin() {
+// signedIn: true right after logging in / signing up → also advise installing the app.
+export async function afterLogin({ signedIn = false } = {}) {
   try {
     const pending = await api("GET", "/payday/pending");
     if (pending && prefs.get("rf_payday_snooze") !== iso(today())) {
@@ -247,6 +249,12 @@ export async function afterLogin() {
       if (result?.new_badges?.length) showBadges(result.new_badges);
     }
   } catch {}
+  if (signedIn) await adviseInstall();       // "Install RoomFund" (not a shortcut) after every sign-in
+}
+
+// The service worker makes RoomFund installable (and opens the last-seen screens offline).
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => navigator.serviceWorker.register("/sw.js").catch(() => {}));
 }
 
 // ---------- Start ----------

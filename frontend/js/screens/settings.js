@@ -7,6 +7,7 @@ import { h, px, button, field, moneyInput, banner, confirmBox, api, store, auth,
 import { icon } from "../icons.js";
 import { go, back, tabBar, refreshTabbar } from "../app.js";
 import { moneyPopup, namePopup, calendar } from "./popups.js";
+import { canInstall, adviseInstall } from "../install.js";
 
 const FREQ = { weekly: "Weekly", biweekly: "Every 2 weeks", monthly: "Monthly", irregular: "It varies" };
 
@@ -124,6 +125,8 @@ export function settingsScreen(ctx) {
           preview),
       ]),
       h("div", { style: { height: "8px" } }),
+      canInstall() ? button("📲 Install the RoomFund app", () => adviseInstall(), "primary") : null,
+      canInstall() ? h("div", { style: { height: "12px" } }) : null,
       button("Log out", async () => {
         const yes = await confirmBox({ title: "Log out?", text: "You can log back in any time with your email or Google.", yes: "Log out", no: "Cancel" });
         if (!yes) return;

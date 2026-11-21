@@ -1092,7 +1092,7 @@ def remove_room(db: Session = Depends(get_db), user: User = Depends(get_current_
 async def no_stale_page_files(request: Request, call_next):
     response = await call_next(request)
     path = request.url.path
-    if path == "/" or path.endswith((".html", ".js", ".css", ".svg")):
+    if path == "/" or path.endswith((".html", ".js", ".css", ".svg", ".json")):
         response.headers["Cache-Control"] = "no-cache"   # "you may keep it, but ask me first"
     return response
 

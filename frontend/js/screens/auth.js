@@ -104,7 +104,7 @@ export async function playSplash(renderNext, { greet = null } = {}) {
 // The form fades out; only the wordmark stays and glides to the centre (48.6px, Fund stays pink),
 // "Hi {name} 👋" fades in, hold, then the wordmark glides to the top-left of Items (22px, Fund green).
 async function greetAndEnter(name) {
-  if (reduceMotion()) { await go("/items", "none"); afterLogin(); return; }
+  if (reduceMotion()) { await go("/items", "none"); afterLogin({ signedIn: true }); return; }
   const fromEl = document.querySelector(".auth .logo .wordmark");
   const from = fromEl?.getBoundingClientRect();
   const overlay = h("div", { class: "greeting" });
@@ -145,7 +145,7 @@ async function greetAndEnter(name) {
     target.style.visibility = "";
   } else await wait(700);
   overlay.remove();
-  afterLogin();
+  afterLogin({ signedIn: true });
 }
 
 async function finishLogin(token) {
