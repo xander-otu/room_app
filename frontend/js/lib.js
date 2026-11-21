@@ -140,7 +140,9 @@ export function applyTheme() {
 }
 
 // Haptics (Section 23): one helper, only these patterns.
-const PATTERNS = { tap: [10], tick: [8], success: [20, 40, 20], thud: [35], celebrate: [15, 30, 15, 30, 40], warning: [25, 60, 25], error: [40, 50, 40] };
+// Longer than the design's 8–40ms: the small vibration motors in many budget Android phones
+// can't be felt below ~25ms. (Numbers = milliseconds: buzz, pause, buzz...)
+const PATTERNS = { tap: [30], tick: [25], success: [40, 60, 40], thud: [60], celebrate: [30, 50, 30, 50, 80], warning: [40, 80, 40], error: [60, 70, 60] };
 export const canVibrate = () => "vibrate" in navigator;
 export function hapticsOn() { return canVibrate() && prefs.get("rf_haptics", "1") === "1"; }
 export function haptic(kind) { if (hapticsOn()) try { navigator.vibrate(PATTERNS[kind] || 10); } catch {} }

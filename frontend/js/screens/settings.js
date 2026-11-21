@@ -3,11 +3,11 @@
 // Design PDF Sections 7C, 7F, 12, 18, 19, 23, 24.
 // ---------------------------------------------------------
 import { h, px, button, field, moneyInput, banner, confirmBox, api, store, auth, prefs, haptic, naira, money, errorCard, skeleton,
-         canVibrate, isIPhone, applyTheme, applyReduceMotion, reduceMotion, iso, today, fmtDay, fmtShort, parseDate } from "../lib.js";
+         canVibrate, isIPhone, applyTheme, applyReduceMotion, reduceMotion, iso, today, fmtDay, fmtShort, parseDate, toast } from "../lib.js";
 import { icon } from "../icons.js";
 import { go, back, tabBar, refreshTabbar } from "../app.js";
 import { moneyPopup, namePopup, calendar } from "./popups.js";
-import { canInstall, adviseInstall } from "../install.js";
+import { canInstall, adviseInstall, installStatus, showFindHelp } from "../install.js";
 
 const FREQ = { weekly: "Weekly", biweekly: "Every 2 weeks", monthly: "Monthly", irregular: "It varies" };
 
@@ -116,6 +116,11 @@ export function settingsScreen(ctx) {
       card([
         block("Reduce motion", motionToggle, "Fewer animations: no splash, shake or stamp slam."),
         block("Haptics", hapticsToggle, hapticsHint, vib ? "" : "disabled"),
+        // A test button: buzzes even if Haptics is off, so you can check the phone itself.
+        vib ? h("div", { class: "set-block" }, px("button", "btn small auto press", ["📳 Test vibration"], { type: "button", onclick: () => {
+          try { navigator.vibrate([60, 80, 60]); } catch {}
+          toast("Felt it? If not, check your phone isn’t on silent, Do Not Disturb or battery saver.", 4000);
+        } })) : null,
       ]),
       h("div", { class: "section-label" }, "Bottom bar"),
       card([
@@ -126,7 +131,8 @@ export function settingsScreen(ctx) {
       ]),
       h("div", { style: { height: "8px" } }),
       canInstall() ? button("📲 Install the RoomFund app", () => adviseInstall(), "primary") : null,
-      canInstall() ? h("div", { style: { height: "12px" } }) : null,
+      installStatus() === "installed" ? button("📲 RoomFund is installed: where is it?", () => showFindHelp()) : null,
+      ["available", "iphone", "installed"].includes(installStatus()) ? h("div", { style: { height: "12px" } }) : null,
       button("Log out", async () => {
         const yes = await confirmBox({ title: "Log out?", text: "You can log back in any time with your email or Google.", yes: "Log out", no: "Cancel" });
         if (!yes) return;
