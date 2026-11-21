@@ -60,10 +60,13 @@ def calculate_new_price(current_price, monthly_increase_percent, months):
 #   - when you buy, the money LEAVES your pocket; the next item starts from what's left
 # Input:  all_items = items in ANY order (it sorts them itself)
 #         income_available = money the user has saved right now (e.g. 100000)
-#         monthly_income   = money the user adds every month (e.g. 50000)
-#         (later, main.py will get these two from the settings table)
-# Output: a list of small dictionaries, one per item: name, running total, month.
-def buy_timeline(all_items, income_available, monthly_income):
+#         monthly_income   = money the user adds every month ON AVERAGE (e.g. 50000)
+#         monthly_incomes  = OPTIONAL: the money expected in each month from real paydays,
+#                            [month 1, month 2, ...]. When given, the pocket grows by these
+#                            instead of the flat average (a skipped payday = less that month).
+# Output: a list of small dictionaries, one per item: name, running total, month,
+#         plus item_id, the price paid then, the original price and its % rise.
+def buy_timeline(all_items, income_available, monthly_income, monthly_incomes=None):
     running_total = 0              # total spent so far; the "till" starts at zero
     running_total_list = []        # collects one result dictionary per item
     full_list = arrange_items(all_items)   # call our own sorter first, so the order handed in never matters
@@ -86,7 +89,11 @@ def buy_timeline(all_items, income_available, monthly_income):
         month_before = month               # remember where we were, in case we give up on this item
         money_before = money_i_have
         while new_price > money_i_have:
-            money_i_have += monthly_income   # the money grows by one month of savings
+            # This month's money: from the real paydays if we know them, else the flat average.
+            if monthly_incomes and month < len(monthly_incomes):
+                money_i_have += monthly_incomes[month]   # [0] = month 1, [1] = month 2...
+            else:
+                money_i_have += monthly_income   # the money grows by one month of savings
             duplicate_new_price = new_price  # PHOTO of last month's price, before it changes
             month += 1                       # one more month has passed
             new_price = calculate_new_price(duplicate_price, percent, month)   # the price at THIS month
@@ -103,12 +110,16 @@ def buy_timeline(all_items, income_available, monthly_income):
             # Go back to before we tried, so the next items aren't pushed later for nothing.
             month = month_before
             money_i_have = money_before
-            family = {"Item" : name, "Running Total" : running_total, "Month": "never"}
+            family = {"Item" : name, "Running Total" : running_total, "Month": "never",
+                      "item_id": item.get("id"), "Price": duplicate_price,
+                      "Original Price": duplicate_price, "Pct": percent}
         else:
             # BUY IT: the money leaves your pocket (the price as it is NOW, not the old one)
             money_i_have = money_i_have - new_price
             running_total += new_price         # total SPENT so far, at the prices you actually paid (with inflation)
             # One "row" of the answer: labels are fixed text, values are variables
-            family = {"Item" : name, "Running Total" : running_total, "Month": month}
+            family = {"Item" : name, "Running Total" : running_total, "Month": month,
+                      "item_id": item.get("id"), "Price": new_price,          # what it costs THEN
+                      "Original Price": duplicate_price, "Pct": percent}      # for "Was ₦40,000 · rises 10%/month"
         running_total_list.append(family)  # add this row to the results (bought OR flagged)
     return running_total_list          # just the list of rows (each row already has its month)

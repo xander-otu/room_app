@@ -54,9 +54,11 @@ def verify_password(password: str, hashed: str) -> bool:
 # --- 2. Tokens (the wristband) ---
 
 # create_token: make a signed wristband saying "this is user <id>", valid for 1 day.
-def create_token(user_id: int) -> str:
+# "ver" = the user's token_version. A password reset adds 1 to it, so every
+# wristband made BEFORE the reset stops working (= "logs out other sessions").
+def create_token(user: User) -> str:
     expires = datetime.now(timezone.utc) + TOKEN_LIFETIME
-    payload = {"sub": str(user_id), "exp": expires}   # sub = "subject" = who it's for; exp = expiry time
+    payload = {"sub": str(user.id), "ver": user.token_version, "exp": expires}   # sub = who it's for; exp = expiry
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
 
@@ -81,9 +83,46 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])   # checks signature AND expiry
         user_id = int(payload["sub"])
+        version = int(payload.get("ver", 0))         # old tokens (before versions existed) count as 0
     except (jwt.PyJWTError, KeyError, ValueError):   # fake / expired / broken token
         raise NOT_LOGGED_IN
     user = db.get(User, user_id)
-    if user is None:                                 # valid token, but that user no longer exists
+    if user is None or user.token_version != version:   # user gone, OR password was reset since this login
         raise NOT_LOGGED_IN
     return user
+
+
+# --- 4. Continue with Google ---
+
+GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID")   # from Google Cloud Console; put it in .env
+
+
+# verify_google_token: ask Google's library "is this ID token real, for OUR app, and is the
+# email verified?" Returns Google's info about the person, or None if anything is wrong.
+def verify_google_token(token: str) -> dict | None:
+    if not GOOGLE_CLIENT_ID:
+        return None                                  # Google login isn't set up yet
+    try:
+        from google.oauth2 import id_token           # imported here so the app still runs without it
+        from google.auth.transport import requests as google_requests
+        info = id_token.verify_oauth2_token(token, google_requests.Request(), GOOGLE_CLIENT_ID)
+    except Exception:                                # bad / expired / wrong app / no internet...
+        return None
+    if not info.get("email_verified"):
+        return None
+    return info
+
+
+# --- 5. Password reset links ---
+
+# make_reset_token: a long random secret for the email link. We only store its HASH,
+# so even someone who reads the database can't use the links.
+def make_reset_token() -> tuple[str, str]:
+    import secrets, hashlib
+    token = secrets.token_urlsafe(32)
+    return token, hashlib.sha256(token.encode()).hexdigest()
+
+
+def hash_reset_token(token: str) -> str:
+    import hashlib
+    return hashlib.sha256(token.encode()).hexdigest()

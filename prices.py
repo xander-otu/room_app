@@ -10,21 +10,23 @@ from datetime import date
 # Rule: if the newest price is the LOWEST you've ever seen (or equal to it),
 #       buy now. Otherwise you've seen it cheaper before, so hold.
 # Input:  item_price = the price saved on the item when you added it (your starting point)
-#         prices     = the prices you logged, OLDEST first, e.g. [45000, 42000, 39000]
+#         checks     = the prices you logged as (price, source) pairs, OLDEST first,
+#                      e.g. [(45000, "Jumia"), (42000, "Jiji")]
 # Output: two things: the verdict ("BUY NOW" / "HOLD" / "NO DATA") and a short reason.
-def buy_or_hold(item_price, prices):
-    if len(prices) == 0:                       # nothing logged yet: nothing to compare
-        return "NO DATA", "Log a price you've seen to get a verdict."
+def buy_or_hold(item_price, checks):
+    if len(checks) == 0:                       # nothing logged yet: nothing to compare
+        return "NO DATA", "Not enough prices yet to judge."
 
-    newest = prices[-1]                        # [-1] = the LAST one in the list = the newest
-    earlier = [item_price] + prices[:-1]       # everything BEFORE the newest ([:-1] = all except the last)
-    lowest_before = min(earlier)               # min() = the smallest number in a list
+    newest = checks[-1][0]                     # [-1] = the LAST one = the newest; [0] = its price
+    # Everything BEFORE the newest ([:-1] = all except the last), plus your planned price (no shop).
+    earlier = [(item_price, None)] + checks[:-1]
+    lowest_price, lowest_source = min(earlier, key=lambda c: c[0])   # the cheapest pair, by price
 
     # f"...{x:,}" puts commas in big numbers: 39000 → 39,000
-    if newest <= lowest_before:
-        return "BUY NOW", f"₦{newest:,} is the lowest price you've seen (before: ₦{lowest_before:,})."
-    else:
-        return "HOLD", f"₦{newest:,} is higher than ₦{lowest_before:,}, which you've seen before. Wait."
+    if newest <= lowest_price:
+        return "BUY NOW", f"₦{newest:,} is the lowest price you've seen (before: ₦{lowest_price:,}). Grab it."
+    where = f" on {lowest_source}" if lowest_source else ""
+    return "HOLD", f"₦{newest:,} is more than the lowest you've seen (₦{lowest_price:,}{where})."
 
 
 # estimate_monthly_pct: work out how fast the price is REALLY changing per month,

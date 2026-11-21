@@ -33,14 +33,32 @@ def savings_streak(save_days, today: date) -> int:
 
 
 # BADGES: every badge, and what it takes to earn it. One place to add new ones.
-# Each one: (name, description, what to check, how many needed)
+# Each one: (key, name, description, what to check, how many needed, show "3/5"?)
+# The descriptions are the exact words on the Progress screen.
 BADGES = [
-    ("First Naira",   "Log your first savings",           "saves",  1),
-    ("On a Roll",     "Save 4 weeks in a row",            "streak", 4),
-    ("Price Watcher", "Log 5 prices you've seen",         "checks", 5),
-    ("First Buy",     "Buy your first item",              "bought", 1),
-    ("Room Builder",  "Buy 5 items",                      "bought", 5),
+    ("first_naira",    "First Naira",    "Log your first savings",           "saves",          1,  False),
+    ("on_a_roll",      "On a Roll",      "Save 4 weeks in a row",            "streak",         4,  False),
+    ("first_buy",      "First Buy",      "Buy your first item",              "bought",         1,  False),
+    ("halfway_there",  "Halfway There",  "Reach 50% of your room",           "room_percent",  50,  False),
+    ("price_watcher",  "Price Watcher",  "Log 5 prices you've seen",         "checks",         5,  True),
+    ("room_builder",   "Room Builder",   "Buy 5 items",                      "bought",         5,  True),
+    ("payday_pro",     "Payday Pro",     "Answer 3 payday check-ins",        "payday_answers", 3,  True),
+    ("streak_master",  "Streak Master",  "Save 12 weeks in a row",           "streak",        12,  True),
+    ("bargain_hunter", "Bargain Hunter", "Buy something below its price",    "bargains",       1,  False),
+    ("snapshot",       "Snapshot",       "Add photos to 3 items",            "photos",         3,  True),
+    ("comeback",       "Comeback",       "Start saving again after a break", "comeback",       1,  False),
+    ("room_planner",   "Room Planner",   "Import a room from ChatGPT",       "room_imported",  1,  False),
 ]
+
+
+# came_back: True if you ever saved in a week right after a week with NO saving,
+# having saved at some point before that (your streak restarted). That's "Comeback".
+def came_back(save_days) -> bool:
+    weeks = sorted({week_start(d) for d in save_days})   # every week you saved, oldest first
+    for earlier, later in zip(weeks, weeks[1:]):          # zip pairs each week with the next one
+        if later - earlier > timedelta(weeks=1):          # a gap of at least one empty week
+            return True
+    return False
 
 
 # percent: "how full is the bar?" as a whole number from 0 to 100.
@@ -51,15 +69,20 @@ def percent(part, whole) -> int:
     return min(100, int(part / whole * 100))   # min(100, ...) = cap it at a full bar
 
 
-# badges: which badges you've earned.
-# Input: your numbers so far, e.g. {"saves": 3, "streak": 2, "checks": 0, "bought": 1}
-# Output: a list of {"name", "description", "earned": True/False}
+# badges: which badges your numbers have reached RIGHT NOW.
+# Input: your numbers so far, e.g. {"saves": 3, "streak": 2, "checks": 0, "bought": 1, ...}
+# Output: a list of {"key", "name", "description", "reached", "progress", "goal", "show_progress"}
+# (main.py remembers earned badges in the database, so they're never taken away.)
 def badges(stats):
     result = []
-    for name, description, stat, needed in BADGES:   # unpack each badge's 4 parts into 4 names
+    for key, name, description, stat, needed, show in BADGES:   # unpack each badge's 6 parts
         result.append({
+            "key": key,
             "name": name,
             "description": description,
-            "earned": stats[stat] >= needed,         # True once your number reaches what's needed
+            "reached": stats[stat] >= needed,        # True once your number reaches what's needed
+            "progress": min(stats[stat], needed),    # e.g. 3 (of 5), never more than the goal
+            "goal": needed,
+            "show_progress": show,                   # only some badges show "3/5"
         })
     return result

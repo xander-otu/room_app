@@ -7,8 +7,8 @@
 # Mapped: label saying "this column holds this Python type"
 # mapped_column: extra settings for a column (primary key, default...)
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
-from sqlalchemy import ForeignKey   # ForeignKey: "this column points at a row in another table"
-from datetime import date           # date: a calendar day like 2026-11-20 (no time)
+from sqlalchemy import ForeignKey, UniqueConstraint   # ForeignKey: "this column points at a row in another table"
+from datetime import date, datetime                   # date: a calendar day; datetime: a day + a time
 
 
 # Base: every table class inherits from this, so SQLAlchemy can find them all
@@ -23,7 +23,22 @@ class User(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     email: Mapped[str] = mapped_column(unique=True)           # unique=True: two accounts can't share an email
-    hashed_password: Mapped[str]                              # the BLENDED password, never the real one
+    hashed_password: Mapped[str | None]                       # the BLENDED password. None = Google-only account
+    name: Mapped[str] = mapped_column(default="")             # "Hi Xander": what RoomFund calls you
+    google_sub: Mapped[str | None] = mapped_column(unique=True)   # Google's id for you, if you used "Continue with Google"
+    token_version: Mapped[int] = mapped_column(default=0)     # +1 on password reset → every old login token stops working
+
+
+# Room: the room you planned (in ChatGPT) and imported (ONE per user, optional).
+class Room(Base):
+    __tablename__ = "rooms"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), unique=True)   # unique: one room per user
+    name: Mapped[str]                                         # e.g. "My bedroom"
+    width_cm: Mapped[int | None]                              # optional room size (for the floor plan later)
+    length_cm: Mapped[int | None]
+    created_at: Mapped[datetime | None] = mapped_column(default=datetime.now)
 
 
 # Item: one thing you want for your room (one row in the "items" table).
@@ -40,6 +55,11 @@ class Item(Base):
     price: Mapped[int]                                        # whole naira, required
     priority: Mapped[str]                                     # high / medium / low (Pydantic enforces this)
     monthly_price_increase_pct: Mapped[float | None] = mapped_column(default=0.0)  # inflation per month, %
+    notes: Mapped[str | None]                                 # optional notes, e.g. "6 inch foam" (search looks here too)
+    photo_url: Mapped[str | None]                             # one photo per item, e.g. "/uploads/item_3_ab12.jpg"
+    bought_price: Mapped[int | None]                          # what you REALLY paid (for "Bought for ₦175,000")
+    bought_on: Mapped[date | None]                            # the day you bought it
+    room_id: Mapped[int | None] = mapped_column(ForeignKey("rooms.id"))   # set when it came from a room import
 
 
 # Settings: one row PER USER holding their savings info.
@@ -51,18 +71,7 @@ class Settings(Base):
     saved_so_far: Mapped[int] = mapped_column(default=0)      # naira saved so far
     monthly_savings: Mapped[int] = mapped_column(default=0)   # naira you save each month
     show_room_tab: Mapped[bool] = mapped_column(default=False)  # the optional "My Room" tab: off unless you switch it on
-
-
-# Room: the room you planned with Claude and imported (ONE per user, optional).
-# Items don't point at the room: all your items are for your room anyway.
-class Room(Base):
-    __tablename__ = "rooms"
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), unique=True)   # unique: one room per user
-    name: Mapped[str]                                         # e.g. "My bedroom"
-    width_cm: Mapped[int | None]                              # optional room size (for the floor plan later)
-    length_cm: Mapped[int | None]
+    list_density: Mapped[str] = mapped_column(default="moderate")   # compact / moderate / comfortable
 
 
 # PriceCheck: one price you SAW for an item, somewhere, on some day (one row in "price_checks").
@@ -88,3 +97,50 @@ class SavingsLog(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))   # WHO saved it
     amount: Mapped[int]                                            # whole naira saved this time
     saved_on: Mapped[date]                                         # the day you saved it
+    source: Mapped[str] = mapped_column(default="saved")           # "saved" (by hand) or "payday" (a payday check-in)
+
+
+# PaySchedule: how and when money comes in (Settings → Money → Payday). One per user.
+class PaySchedule(Base):
+    __tablename__ = "pay_schedules"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), unique=True)
+    frequency: Mapped[str]                                         # weekly / biweekly / monthly / irregular
+    next_payday: Mapped[date | None]                               # the next payday we haven't asked about yet
+    amount: Mapped[int | None]                                     # what you save from each payday (None if irregular)
+
+
+# Payday: one payday we asked (or will ask) "did your money land?" about.
+class Payday(Base):
+    __tablename__ = "paydays"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    expected_date: Mapped[date]
+    status: Mapped[str] = mapped_column(default="pending")         # pending / received / rescheduled / skipped
+    rescheduled_to: Mapped[date | None]
+    amount_received: Mapped[int | None]
+    answered_at: Mapped[datetime | None]                           # when you first answered (any answer counts for Payday Pro)
+
+
+# UserBadge: a badge you've earned, and when. Badges are never taken away.
+class UserBadge(Base):
+    __tablename__ = "user_badges"
+    __table_args__ = (UniqueConstraint("user_id", "key"),)        # each badge only once per user
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    key: Mapped[str]                                               # e.g. "first_naira"
+    earned_at: Mapped[datetime] = mapped_column(default=datetime.now)
+
+
+# PasswordReset: a "set a new password" link. We store only a HASH of the secret token.
+class PasswordReset(Base):
+    __tablename__ = "password_resets"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    token_hash: Mapped[str] = mapped_column(unique=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    expires_at: Mapped[datetime]                                   # 30 minutes after it was made
+    used_at: Mapped[datetime | None]
