@@ -2,7 +2,7 @@
 // progress.js: the progress bar component (Section 11) and
 // the 08 Progress screen with badges (Section 12).
 // ---------------------------------------------------------
-import { h, px, button, api, store, naira, money, errorCard, skeleton, haptic, reduceMotion } from "../lib.js";
+import { h, px, button, api, store, naira, money, errorCard, skeleton, haptic, reduceMotion, countUp } from "../lib.js";
 import { icon } from "../icons.js";
 import { go } from "../app.js";
 import { BADGE_ICONS, showBadges, confetti } from "../fx.js";
@@ -11,7 +11,7 @@ const BLOCK = 16, GAP = 3;      // square blocks, 16px wide with 3px gaps (Secti
 
 // progressBar: label + % on one row, a pixel track of square blocks, a "₦X saved of ₦Y" line.
 // As many blocks as fit the track; filled blocks = round(percent × block count).
-// The filled blocks light up one after another when the bar appears.
+// The filled blocks light up one after another when the bar appears, and the % rolls up.
 // kind "next": 100% shows "You can buy it now!" + a link to that item.
 export function progressBar({ label, percent, under, kind = "next", itemId = null }) {
   const full = percent >= 100;
@@ -31,8 +31,10 @@ export function progressBar({ label, percent, under, kind = "next", itemId = nul
     }
   };
   new ResizeObserver(fill).observe(blocks);       // works out the count once it's on screen (and on resize)
+  const pctEl = h("span", { class: "pct num" }, `${percent}%`);
+  countUp(pctEl, percent, (v) => `${v}%`);          // the % rolls up while the blocks light up
   return h("div", { class: `pbar ${full ? "full" : ""}`, role: "progressbar", "aria-valuenow": String(percent), "aria-valuemin": "0", "aria-valuemax": "100", "aria-label": label },
-    h("div", { class: "row" }, h("span", { class: "lbl" }, label), h("span", { class: "pct num" }, `${percent}%`)),
+    h("div", { class: "row" }, h("span", { class: "lbl" }, label), pctEl),
     px("div", "track", [blocks]),
     h("div", { class: "under" }, ...under),
     full && kind === "next" && itemId ? h("button", { type: "button", class: "ready link press", onclick: () => go(`/items/${itemId}`) }, "You can buy it now! →") : null,
@@ -43,8 +45,9 @@ export function nextItemBar(next) {
   return progressBar({ label: `Next: ${next.name}`, percent: next.percent, itemId: next.item_id,
     under: [money(next.saved), " saved of ", money(next.price)] });
 }
-export function roomBar(room, label = "Done so far") {
-  return progressBar({ label, percent: room.percent, kind: "room", under: [money(room.bought_value), " of ", money(room.total_value), " bought"] });
+// under: optional custom line (My Room shows "1 of 6 bought · ₦85,000 of ₦503,000").
+export function roomBar(room, label = "Done so far", under = null) {
+  return progressBar({ label, percent: room.percent, kind: "room", under: under || [money(room.bought_value), " of ", money(room.total_value), " bought"] });
 }
 
 // ---------- 08 Progress ----------
@@ -62,7 +65,7 @@ export function progressScreen(ctx) {
   const draw = (p, settings) => {
     const complete = p.room.total_value > 0 && p.room.percent >= 100;
     const roomCard = px("div", `card room-card ${complete ? "done" : ""}`, [
-      h("div", { class: "head" }, h("div", { class: "ic" }, icon("house", "lg")),
+      h("div", { class: "head" }, px("div", `ic-box ${complete ? "done" : ""}`, [icon("house", "lg")]),
         h("div", {}, h("h3", {}, complete ? "Room complete! 🎉" : "My room"),
           h("div", { class: "pixel-text sm muted" }, complete ? "Everything on your list is bought." : "Measured by money, not item count"))),
       roomBar(p.room),
@@ -82,7 +85,7 @@ export function progressScreen(ctx) {
         stat("cart", String(p.items_bought), "Items bought", "var(--soft-lilac)")),
       h("div", { class: "section-title" }, "Badges"),
       h("div", { class: "badges" }, ...visible.map((b) => px("div", `badge ${b.earned ? "" : "locked"}`, [
-        h("div", { class: `octagon big ${b.earned ? "" : "locked"}` }, icon(b.earned ? (BADGE_ICONS[b.key] || "star") : "lock", "lg")),
+        px("div", `octagon big ${b.earned ? "" : "locked"}`, [icon(b.earned ? (BADGE_ICONS[b.key] || "star") : "lock", "lg")]),
         h("div", { class: "nm" }, b.name),
         h("div", { class: "ds" }, b.description, !b.earned && b.show_progress ? ` · ${b.progress}/${b.goal}` : ""),
       ]))),

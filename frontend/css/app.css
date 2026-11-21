@@ -1,4 +1,4 @@
-﻿/* =========================================================
+/* =========================================================
    RoomFund styles. Section numbers = the v20 design PDF.
    1. Tokens (light + dark)   2. Accents   3. Base + fonts
    4. Pixel corners + shadow + press   5. Components
@@ -130,13 +130,25 @@ img { display: block; max-width: 100%; }
     calc(var(--s3) + var(--b)) calc(100% - var(--b)), calc(var(--s3) + var(--b)) calc(100% - var(--s1) - var(--b)), calc(var(--s2) + var(--b)) calc(100% - var(--s1) - var(--b)), calc(var(--s2) + var(--b)) calc(100% - var(--s2) - var(--b)), calc(var(--s1) + var(--b)) calc(100% - var(--s2) - var(--b)), calc(var(--s1) + var(--b)) calc(100% - var(--s3) - var(--b)), var(--b) calc(100% - var(--s3) - var(--b)));
 }
 /* 1-step notch (chips, small buttons, banners, badges in lists) */
-.st1, .st1 > .px, .chip, .chip > .px, .banner, .banner > .px, .btn.small, .btn.small > .px, .qd, .qd > .px, .verdict-badge, .verdict-badge > .px {
+.st1, .st1 > .px, .chip, .chip > .px, .banner, .banner > .px, .btn.small, .btn.small > .px, .qd, .qd > .px {
   --outer: polygon(0 var(--s), var(--s) var(--s), var(--s) 0, calc(100% - var(--s)) 0, calc(100% - var(--s)) var(--s), 100% var(--s),
     100% calc(100% - var(--s)), calc(100% - var(--s)) calc(100% - var(--s)), calc(100% - var(--s)) 100%, var(--s) 100%, var(--s) calc(100% - var(--s)), 0 calc(100% - var(--s)));
   --inner: polygon(var(--b) calc(var(--s) + var(--b)), calc(var(--s) + var(--b)) calc(var(--s) + var(--b)), calc(var(--s) + var(--b)) var(--b),
     calc(100% - var(--s) - var(--b)) var(--b), calc(100% - var(--s) - var(--b)) calc(var(--s) + var(--b)), calc(100% - var(--b)) calc(var(--s) + var(--b)),
     calc(100% - var(--b)) calc(100% - var(--s) - var(--b)), calc(100% - var(--s) - var(--b)) calc(100% - var(--s) - var(--b)), calc(100% - var(--s) - var(--b)) calc(100% - var(--b)),
     calc(var(--s) + var(--b)) calc(100% - var(--b)), calc(var(--s) + var(--b)) calc(100% - var(--s) - var(--b)), var(--b) calc(100% - var(--s) - var(--b)));
+}
+/* Pixel CIRCLE (timeline dots, the round search/+ buttons, the picked calendar day):
+   a 5-step staircase per quarter, in % so it fits any size. */
+.round, .round > .px, .pdot, .pdot > .px, .cal-pick, .cal-pick > .px {
+  --outer: polygon(0 34.5%, 2.5% 34.5%, 2.5% 20.5%, 9.5% 20.5%, 9.5% 9.5%, 20.5% 9.5%, 20.5% 2.5%, 34.5% 2.5%, 34.5% 0,
+    65.5% 0, 65.5% 2.5%, 79.5% 2.5%, 79.5% 9.5%, 90.5% 9.5%, 90.5% 20.5%, 97.5% 20.5%, 97.5% 34.5%, 100% 34.5%,
+    100% 65.5%, 97.5% 65.5%, 97.5% 79.5%, 90.5% 79.5%, 90.5% 90.5%, 79.5% 90.5%, 79.5% 97.5%, 65.5% 97.5%, 65.5% 100%,
+    34.5% 100%, 34.5% 97.5%, 20.5% 97.5%, 20.5% 90.5%, 9.5% 90.5%, 9.5% 79.5%, 2.5% 79.5%, 2.5% 65.5%, 0 65.5%);
+  --inner: polygon(var(--b) calc(34.5% + var(--b)), calc(2.5% + var(--b)) calc(34.5% + var(--b)), calc(2.5% + var(--b)) calc(20.5% + var(--b)), calc(9.5% + var(--b)) calc(20.5% + var(--b)), calc(9.5% + var(--b)) calc(9.5% + var(--b)), calc(20.5% + var(--b)) calc(9.5% + var(--b)), calc(20.5% + var(--b)) calc(2.5% + var(--b)), calc(34.5% + var(--b)) calc(2.5% + var(--b)), calc(34.5% + var(--b)) var(--b),
+    calc(65.5% - var(--b)) var(--b), calc(65.5% - var(--b)) calc(2.5% + var(--b)), calc(79.5% - var(--b)) calc(2.5% + var(--b)), calc(79.5% - var(--b)) calc(9.5% + var(--b)), calc(90.5% - var(--b)) calc(9.5% + var(--b)), calc(90.5% - var(--b)) calc(20.5% + var(--b)), calc(97.5% - var(--b)) calc(20.5% + var(--b)), calc(97.5% - var(--b)) calc(34.5% + var(--b)), calc(100% - var(--b)) calc(34.5% + var(--b)),
+    calc(100% - var(--b)) calc(65.5% - var(--b)), calc(97.5% - var(--b)) calc(65.5% - var(--b)), calc(97.5% - var(--b)) calc(79.5% - var(--b)), calc(90.5% - var(--b)) calc(79.5% - var(--b)), calc(90.5% - var(--b)) calc(90.5% - var(--b)), calc(79.5% - var(--b)) calc(90.5% - var(--b)), calc(79.5% - var(--b)) calc(97.5% - var(--b)), calc(65.5% - var(--b)) calc(97.5% - var(--b)), calc(65.5% - var(--b)) calc(100% - var(--b)),
+    calc(34.5% + var(--b)) calc(100% - var(--b)), calc(34.5% + var(--b)) calc(97.5% - var(--b)), calc(20.5% + var(--b)) calc(97.5% - var(--b)), calc(20.5% + var(--b)) calc(90.5% - var(--b)), calc(9.5% + var(--b)) calc(90.5% - var(--b)), calc(9.5% + var(--b)) calc(79.5% - var(--b)), calc(2.5% + var(--b)) calc(79.5% - var(--b)), calc(2.5% + var(--b)) calc(65.5% - var(--b)), var(--b) calc(65.5% - var(--b)));
 }
 .pxw {
   --s: 4px; --b: 2px; --off: 4px;
@@ -191,6 +203,7 @@ a.press:active, .link.press:active { transform: none; opacity: 1; text-decoratio
 
 /* Icon buttons (44Ã—44) */
 .icon-btn { width: 44px; height: 44px; flex: none; --s: 3px; --off: 3px; }
+.icon-btn.round { --s: 5px; }      /* the pixel-circle buttons (search, +) */
 .icon-btn > .px { width: 100%; height: 100%; display: grid; place-items: center; color: var(--text); }
 .icon-btn.accent { --fill: var(--accent); }
 .icon-btn.accent > .px { color: var(--accent-on); }
@@ -342,9 +355,11 @@ button.card, .card.press { width: 100%; text-align: left; }
 .thumb { overflow: hidden; background: var(--accent-soft, var(--muted)); display: grid; place-items: center; color: var(--text-muted);
   clip-path: polygon(0 4px, 4px 4px, 4px 0, calc(100% - 4px) 0, calc(100% - 4px) 4px, 100% 4px, 100% calc(100% - 4px), calc(100% - 4px) calc(100% - 4px), calc(100% - 4px) 100%, 4px 100%, 4px calc(100% - 4px), 0 calc(100% - 4px)); }
 .thumb img { width: 100%; height: 100%; object-fit: cover; }
+/* the tick stamp: a tilted green pixel shape with an ink outline (small on cards, big on the item photo) */
 .tick-stamp { position: absolute; top: -8px; right: -6px; z-index: 3; width: 34px; height: 34px; transform: rotate(-10deg);
-  background: var(--bought); border: 2px solid var(--ink); display: grid; place-items: center; color: var(--ink);
-  box-shadow: 2px 2px 0 var(--ink); }
+  --s: 3px; --off: 2px; --fill: var(--bought); --bd: var(--ink); --sh: var(--ink); }
+.tick-stamp > .px { width: 100%; height: 100%; display: grid; place-items: center; color: var(--ink); }
+.tick-stamp.big { width: 58px; height: 58px; top: -14px; right: -12px; --s: 5px; --off: 3px; }
 .list-note { text-align: center; font-family: "Pixelify Sans", monospace; font-size: 13px; color: var(--text-muted); margin: 8px 0 16px; }
 
 /* Progress bar component (Section 11) */
@@ -419,10 +434,35 @@ button.card, .card.press { width: 100%; text-align: left; }
 .badge-pop .lbl { font-family: "Space Grotesk", sans-serif; font-weight: 700; font-size: 9px; color: var(--link); letter-spacing: .5px; }
 .badge-pop .nm { font-family: "Pixelify Sans", monospace; font-weight: 700; font-size: 15px; }
 .badge-pop .ln { font-family: "Pixelify Sans", monospace; font-size: 10px; color: var(--text-muted); }
-.octagon { width: 40px; height: 40px; flex: none; display: grid; place-items: center; background: var(--saving); color: var(--ink);
-  clip-path: polygon(30% 0, 70% 0, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0 70%, 0 30%); }
-.octagon.big { width: 56px; height: 56px; }
-.octagon.locked { background: var(--nodata); }
+/* Pixel octagon (badges, check-in): a stepped shape with an ink outline */
+.octagon { width: 40px; height: 40px; flex: none; --s: 4px; --off: 0px; --fill: var(--saving); --bd: var(--ink); }
+.octagon > .px { width: 100%; height: 100%; display: grid; place-items: center; color: var(--ink); }
+.octagon.big { width: 56px; height: 56px; --s: 5px; }
+.octagon.locked { --fill: var(--nodata); --bd: #9A9A9A; }
+.octagon.locked > .px { color: #555; }
+.octagon.money { --fill: var(--money); }
+.octagon.money > .px { color: #fff; }
+/* Stepped icon box (streak flame, room house, timeline calendar) */
+.ic-box { flex: none; width: 48px; height: 48px; --s: 3px; --off: 0px; --fill: var(--accent); --bd: var(--ink); }
+.ic-box > .px { width: 100%; height: 100%; display: grid; place-items: center; color: var(--ink); }
+.ic-box.sky { --fill: #6CC6FF; width: 40px; height: 40px; }
+.ic-box.yellow { --fill: var(--saving); }
+.ic-box.red { --fill: var(--wanted); width: 40px; height: 40px; }
+.ic-box.done { --fill: var(--bought); }
+.ic-box.big { width: 60px; height: 60px; --s: 5px; }
+.ic-box.big > .px { color: var(--accent-on, var(--ink)); }
+/* Titles in the pixel font, like Figma */
+.state-card h3, .how h3, .room-title, .search-head { font-family: "Pixelify Sans", monospace !important; font-weight: 700; }
+.state-card h3 { font-size: 20px; }
+.room-title { font-size: 22px; margin: 0 0 2px; }
+.search-head { font-size: 16px; margin: 8px 0 12px; }
+/* "How it works" card (My Room): wood tint, numbers on little pixel boxes */
+.how { --fill: var(--accent-soft); }
+.how li::before { clip-path: polygon(0 3px, 3px 3px, 3px 0, calc(100% - 3px) 0, calc(100% - 3px) 3px, 100% 3px, 100% calc(100% - 3px), calc(100% - 3px) calc(100% - 3px), calc(100% - 3px) 100%, 3px 100%, 3px calc(100% - 3px), 0 calc(100% - 3px)); }
+/* Floor plan placeholder: faint grid, dashed furniture boxes, a wood pill on top */
+.floor-ph .fb { position: absolute; border: 2px dashed color-mix(in srgb, var(--accent) 60%, transparent); background: color-mix(in srgb, var(--accent) 25%, transparent); }
+.floor-ph .lbl { position: relative; z-index: 1; --fill: var(--accent); }
+.floor-ph .lbl > .px { padding: 8px 14px; font-family: "Space Grotesk", sans-serif; font-weight: 700; font-size: 13px; color: var(--accent-on); }
 .confetti { position: fixed; z-index: 79; left: 0; top: 0; pointer-events: none; }
 
 /* Empty / error / loading */
@@ -460,7 +500,7 @@ button.card, .card.press { width: 100%; text-align: left; }
 .splash { position: fixed; inset: 0; z-index: 100; background: var(--page); display: grid; place-items: center; }
 .splash .group { display: flex; flex-direction: column; align-items: center; gap: 12px; }
 .splash .lockup { display: flex; align-items: center; gap: 10px; }
-.splash .mark { width: 72px; height: 72px; }
+.splash .mark { width: 76px; height: auto; }      /* the Figma mark is 101 × 80 (with its shadow) */
 .splash .wordmark { font-size: 40px; }
 .splash .tag { font-family: "Pixelify Sans", monospace; font-size: 16px; color: var(--text-muted); }
 .greeting { position: fixed; inset: 0; z-index: 90; background: var(--page); display: grid; place-items: center; }
@@ -479,14 +519,14 @@ button.card, .card.press { width: 100%; text-align: left; }
   font-family: "Pixelify Sans", monospace; font-weight: 700; font-size: 34px; letter-spacing: 3px; background: color-mix(in srgb, var(--surface) 55%, transparent); pointer-events: none; }
 .price-line { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 16px; }
 .price-line .big { font-family: "Inter", sans-serif; font-weight: 700; font-size: 32px; }
-.verdict-badge { display: inline-flex; margin-bottom: 12px; --s: 3px; --off: 3px; }
+.verdict-badge { display: inline-flex; margin-bottom: 12px; --s: 4px; --off: 3px; }
 .verdict-badge > .px { padding: 8px 14px; font-family: "Space Grotesk", sans-serif; font-weight: 700; font-size: 22px; color: var(--ink); }
 .verdict-badge.buy { --fill: var(--bought); }
 .verdict-badge.hold { --fill: var(--saving); }
 .verdict-badge.nodata { --fill: var(--nodata); }
 .verdict-badge.bought { --fill: var(--bought); }
 .tl-card > .px { display: flex; gap: 12px; align-items: center; padding: 12px 14px; }
-.tl-card .ic { width: 40px; height: 40px; background: #6CC6FF; display: grid; place-items: center; color: #111; flex: none; border: 2px solid var(--ink); }
+
 .chart > .px { padding: 14px 12px 10px; }
 .chart .cap { font-family: "Pixelify Sans", monospace; font-size: 11px; color: var(--text-muted); margin-bottom: 8px; }
 .chart .bars { display: flex; align-items: flex-end; justify-content: space-around; gap: 10px; height: 150px; }
@@ -515,10 +555,11 @@ button.card, .card.press { width: 100%; text-align: left; }
 .plan { position: relative; padding-left: 36px; }
 .plan::before { content: ""; position: absolute; left: 12px; top: 12px; bottom: 24px; width: 4px; background: var(--border); }
 .stop { position: relative; }
-.stop .pdot { position: absolute; left: -32px; top: 18px; width: 20px; height: 20px; background: var(--accent); border: 2px solid var(--border);
-  clip-path: polygon(0 4px, 4px 4px, 4px 0, calc(100% - 4px) 0, calc(100% - 4px) 4px, 100% 4px, 100% calc(100% - 4px), calc(100% - 4px) calc(100% - 4px), calc(100% - 4px) 100%, 4px 100%, 4px calc(100% - 4px), 0 calc(100% - 4px)); }
-.stop.now .pdot { background: var(--surface); }
-.stop.never .pdot { background: var(--wanted); }
+/* the stop dots: little pixel circles with an ink outline, sitting on the 4px line */
+.stop .pdot { position: absolute; left: -34px; top: 16px; width: 24px; height: 24px; z-index: 1; --s: 3px; --off: 0px; --fill: var(--accent); --bd: var(--border); }
+.stop .pdot > .px { width: 100%; height: 100%; }
+.stop.now .pdot { --fill: var(--surface); }
+.stop.never .pdot { --fill: var(--wanted); }
 .stop .card > .px { padding: 12px 14px; }
 .stop .top { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .stop .when { font-family: "Pixelify Sans", monospace; font-size: 12px; color: var(--text-muted); }
@@ -530,13 +571,15 @@ button.card, .card.press { width: 100%; text-align: left; }
 
 /* Savings */
 .streak-card { --fill: var(--soft-yellow); }
-.streak-card .big { font-family: "Space Grotesk", sans-serif; font-weight: 700; font-size: 22px; }
+.streak-card .big { font-family: "Pixelify Sans", monospace; font-weight: 700; font-size: 22px; }
 .weeks { display: flex; gap: 6px; margin-top: 12px; }
-.weeks .wk { width: 28px; height: 28px; border: 2px solid var(--border); background: var(--surface); display: grid; place-items: center; color: var(--ink); }
-.weeks .wk.on { background: var(--saving); }
+.weeks .wk { width: 30px; height: 30px; --s: 3px; --off: 0px; }
+.weeks .wk > .px { width: 100%; height: 100%; display: grid; place-items: center; color: var(--ink); }
+.weeks .wk.on { --fill: var(--saving); --off: 3px; }
 .saving-row { margin-bottom: 12px; }
 .saving-row > .px { display: flex; align-items: center; gap: 12px; padding: 12px 14px; }
-.saving-row .coin { width: 36px; height: 36px; background: var(--saving); border: 2px solid var(--ink); display: grid; place-items: center; color: var(--ink); flex: none; }
+.saving-row .coin { width: 36px; height: 36px; flex: none; --s: 3px; --off: 0px; --fill: var(--soft-green); }
+.saving-row .coin > .px { width: 100%; height: 100%; display: grid; place-items: center; color: var(--money-text); }
 .saving-row .amt { font-family: "Inter", sans-serif; font-weight: 700; color: var(--money-text); font-size: 17px; }
 .saving-row .meta { font-family: "Pixelify Sans", monospace; font-size: 12px; color: var(--text-muted); }
 
@@ -551,9 +594,10 @@ button.card, .card.press { width: 100%; text-align: left; }
 .badge .ds { font-family: "Pixelify Sans", monospace; font-size: 11px; color: var(--text-muted); }
 .badge.locked { opacity: .75; --off: 0px; }
 .room-card { --fill: var(--soft-lilac); }
+.room-card h3 { font-family: "Pixelify Sans", monospace; font-weight: 700; font-size: 22px; }
 .room-card .head { display: flex; gap: 12px; align-items: center; margin-bottom: 12px; }
-.room-card .ic { width: 48px; height: 48px; display: grid; place-items: center; background: var(--accent); border: 2px solid var(--ink); color: var(--ink); }
-.room-card.done .ic { background: var(--bought); }
+
+
 
 /* My Room */
 .how ol { margin: 8px 0 0; padding-left: 0; list-style: none; counter-reset: n; }
@@ -565,15 +609,15 @@ button.card, .card.press { width: 100%; text-align: left; }
 .check-row { margin-bottom: 12px; }
 .check-row > .px { display: flex; align-items: center; gap: 12px; padding: 12px 14px; }
 .check-row.off { opacity: .85; --fill: color-mix(in srgb, var(--surface) 70%, var(--page)); }
-.cbox { width: 26px; height: 26px; flex: none; border: 2px solid var(--ink); background: var(--surface); display: grid; place-items: center; color: var(--ink); }
-.cbox.on { background: var(--accent); box-shadow: 2px 2px 0 var(--ink); }
+.cbox { width: 26px; height: 26px; flex: none; --s: 2px; --off: 0px; --fill: var(--surface); --bd: var(--ink); }
+.cbox > .px { width: 100%; height: 100%; display: grid; place-items: center; color: var(--ink); }
+.cbox.on { --fill: var(--accent); --off: 2px; }
 .check-row .nm { font-family: "Space Grotesk", sans-serif; font-weight: 700; }
 .check-row .meta { font-family: "Pixelify Sans", monospace; font-size: 12px; color: var(--text-muted); }
 .check-row .grow { flex: 1; min-width: 0; }
 .floor-ph > .px { height: 160px; display: grid; place-items: center; padding: 0;
   background-image: none; }
 .floor-ph .grid { position: absolute; inset: 8px; background-image: linear-gradient(var(--muted) 1px, transparent 1px), linear-gradient(90deg, var(--muted) 1px, transparent 1px); background-size: 16px 16px; }
-.floor-ph .lbl { position: relative; font-family: "Pixelify Sans", monospace; font-size: 14px; color: var(--text-muted); background: var(--surface); padding: 4px 8px; }
 .dots-menu { position: absolute; right: 16px; top: 140px; z-index: 40; width: 220px; }
 
 /* Calendar (payday + pick another date) */
@@ -615,12 +659,14 @@ button.card, .card.press { width: 100%; text-align: left; }
 .cal-dow span { font-family: "Pixelify Sans", monospace; font-size: 11px; color: var(--text-muted); padding: 4px 0; }
 .cal-day { height: 38px; font-family: "Inter", sans-serif; font-size: 14px; color: var(--text); border: 2px solid transparent; }
 .cal-day.today { border: 2px dashed var(--text); }
-.cal-day.on { background: var(--accent); color: var(--accent-on); border: 2px solid var(--border); box-shadow: 3px 3px 0 var(--shadow); }
+.cal-day.on { color: var(--accent-on); }
+.cal-pick { width: 34px; height: 34px; margin: 0 auto; --s: 3px; --off: 2px; --fill: var(--accent); }
+.cal-pick > .px { width: 100%; height: 100%; display: grid; place-items: center; font-weight: 700; color: var(--accent-on); }
 .cal-day[disabled] { opacity: .3; cursor: default; }
-.cal-day:not([disabled]):active { transform: translate(2px, 2px); box-shadow: none; }
+
 
 /* Check boxes press like everything else */
-.cbox.press:active { transform: translate(2px, 2px); box-shadow: none; }
+
 .check-row .chip { flex: none; }
 
 /* ---------- 7. Motion ---------- */

@@ -261,11 +261,13 @@ export function tabIcon(name) {
   return span.firstChild;
 }
 
-// The RoomFund logo mark: a pink pixel square with a tick (used on the splash).
+// The RoomFund logo mark, exported from the Figma Logo page (Logo/Mark): a money-green
+// tile with the tick pattern, the white "RF" house, and a hard black shadow.
 export function logoMark(cls = "") {
-  const span = document.createElement("span");
-  span.innerHTML = `<svg class="${cls}" viewBox="0 0 16 16" shape-rendering="crispEdges" aria-hidden="true">
-    <rect x="1" y="1" width="14" height="14" fill="#111"/><rect x="2" y="2" width="12" height="12" fill="#FF7AC6"/>
-    <path d="M4 8h2v2h2v-2h2v-2h2v-2h1v3h-1v2h-2v2h-2v2h-2v-2h-2z" fill="#111"/></svg>`;
-  return span.firstChild;
+  const img = document.createElement("img");
+  img.src = "/img/logo-mark.svg";
+  img.alt = "";
+  img.className = cls;
+  img.setAttribute("aria-hidden", "true");
+  return img;
 }

@@ -205,6 +205,31 @@ async function transition(screen, dir, spec) {
   old.remove();
 }
 
+// ---------- Cards pop in (the game-like feel) ----------
+// Whenever a screen fills with its real content, its main blocks spring in one after
+// another: rise, overshoot a little, settle. Skeletons, pop-ups and Search don't do it.
+const POP = ".card, .item-card, .saving-row, .price-row, .badge, .stat, .check-row, .balance, .money-card, .pbar, .filter-chips, .verdict-badge";
+let popQueue = [], popScheduled = false;
+new MutationObserver((records) => {
+  if (reduceMotion() || location.hash.startsWith("#/search")) return;
+  for (const r of records) for (const n of r.addedNodes) {
+    if (n.nodeType !== 1) continue;
+    const found = n.matches(POP) ? [n] : [...n.querySelectorAll(POP)];
+    for (const el of found) if (!el.parentElement?.closest(POP) && !el.closest(".loading-delay")) popQueue.push(el);
+  }
+  if (popQueue.length && !popScheduled) {
+    popScheduled = true;
+    requestAnimationFrame(() => {
+      popQueue.filter((el) => el.isConnected).slice(0, 14).forEach((el, i) => el.animate([
+        { transform: "translateY(14px) scale(.96)", opacity: 0 },
+        { transform: "translateY(-3px) scale(1.01)", opacity: 1, offset: .7 },
+        { transform: "none", opacity: 1 },
+      ], { duration: 380, delay: Math.min(i * 45, 450), easing: "ease-out", fill: "backwards" }));
+      popQueue = []; popScheduled = false;
+    });
+  }
+}).observe(appEl, { childList: true, subtree: true });
+
 // ---------- Logged out (token expired) ----------
 setLoggedOutHandler((expired) => {
   store.clear();

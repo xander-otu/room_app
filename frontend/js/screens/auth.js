@@ -4,7 +4,7 @@
 // expired, password changed), and the logged-in greeting.
 // Design PDF Sections 2, 4, 5, 7A, 20.
 // ---------------------------------------------------------
-import { h, px, button, field, banner, api, auth, store, haptic, reduceMotion, ApiError } from "../lib.js";
+import { h, px, bigIcon, button, field, banner, api, auth, store, haptic, reduceMotion, ApiError } from "../lib.js";
 import { icon, logoMark } from "../icons.js";
 import { go, back, wordmark, afterLogin } from "../app.js";
 import { shake } from "../fx.js";
@@ -304,7 +304,7 @@ export function forgotScreen(ctx) {
 export function forgotSentScreen(ctx) {
   const email = ctx.query.email || "your email";
   return authScreen([
-    h("div", { class: "big-icon" }, icon("copy", "xl")),
+    bigIcon("copy"),
     h("h1", {}, "Check your email"),
     h("p", { class: "sub" }, `We sent a link to ${email}. It works for 30 minutes.`),
     button("Back to log in", () => go("/login", "back"), "primary"),
@@ -320,7 +320,7 @@ export function resetScreen(ctx) {
   const token = ctx.query.token || "";
   const wrap = h("div", { class: "auth" });
   const expired = () => wrap.replaceChildren(
-    h("div", { class: "big-icon" }, icon("alert", "xl")),
+    bigIcon("alert"),
     h("h1", {}, "Link expired"),
     h("p", { class: "sub" }, "Reset links work for 30 minutes. Ask for a new one."),
     button("Send a new link", () => go("/forgot"), "primary"),
@@ -347,7 +347,7 @@ export function resetScreen(ctx) {
 
 export function passwordChangedScreen() {
   return authScreen([
-    h("div", { class: "big-icon", style: { color: "var(--money-text)" } }, icon("tick", "xl")),
+    bigIcon("tick"),
     h("h1", {}, "All set!"),
     h("p", { class: "sub" }, "Your new password is saved. Log in with it."),
     button("Log in", () => go("/login"), "primary"),

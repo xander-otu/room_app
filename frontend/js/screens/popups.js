@@ -107,7 +107,7 @@ export function calendar({ value = null, min = null, max = null, onPick }) {
         type: "button", class: `cal-day press ${key === t ? "today" : ""} ${key === picked ? "on" : ""}`, disabled: off,
         "aria-label": fmtDay(day), "aria-pressed": String(key === picked),
         onclick: () => { picked = key; draw(); onPick?.(key); },
-      }, String(d)));
+      }, key === picked ? px("span", "cal-pick", [String(d)]) : String(d)));
     }
     inner.replaceChildren(
       h("div", { class: "cal-head" },
@@ -136,7 +136,7 @@ export function paydayCheckin(pending) {
     const showError = (e) => { haptic("error"); err.replaceChildren(banner("error", e.offline ? "You’re offline. Try again." : e.detail)); };
 
     const ask = () => content.replaceChildren(
-      h("div", { class: "icon-top" }, h("div", { class: "octagon big", style: { background: "var(--money)", color: "#fff" } }, icon("target", "lg"))),
+      h("div", { class: "icon-top" }, px("div", "octagon big money", [icon("target", "lg")])),
       h("h2", { style: { textAlign: "center" } }, "Payday check-in 💸"),
       h("p", { class: "lead", style: { textAlign: "center" } }, "Did your allowance land? You usually save ", money(amount), ` on the ${ordinal(usual)}.`),
       button("Yes, I got paid", got, "money"),

@@ -86,7 +86,7 @@ function showOne(b) {
     const rm = reduceMotion();
     let done = false;
     const card = px("div", "badge-pop", [
-      h("div", { class: "octagon" }, icon(BADGE_ICONS[b.key] || "star", "lg")),
+      px("div", "octagon", [icon(BADGE_ICONS[b.key] || "star", "lg")]),
       h("div", {}, h("div", { class: "lbl" }, "BADGE EARNED!"), h("div", { class: "nm" }, b.name), h("div", { class: "ln" }, BADGE_LINES[b.key] || b.description)),
     ], { role: "status", title: "Open Progress" });
     document.body.appendChild(card);

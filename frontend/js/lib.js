@@ -209,7 +209,28 @@ export const store = {
 function animateIn(overlay, card, fromY) {
   if (reduceMotion()) { overlay.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 120 }); return; }
   overlay.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 220, easing: "ease-out" });
-  card.animate([{ transform: `translateY(${fromY})`, opacity: 0 }, { transform: "none", opacity: 1 }], { duration: 220, easing: "ease-out" });
+  // springs into place: rises, overshoots a touch, settles (like a game menu opening)
+  card.animate([
+    { transform: `translateY(${fromY}) scale(.92)`, opacity: 0 },
+    { transform: "translateY(-4px) scale(1.02)", opacity: 1, offset: .7 },
+    { transform: "none", opacity: 1 },
+  ], { duration: 320, easing: "ease-out" });
+}
+
+// countUp(el, to): numbers roll up like a game score (₦0 → ₦100,000, 0% → 58%).
+export function countUp(el, to, format = naira, ms = 650) {
+  if (!el) return;
+  if (reduceMotion() || !to) { el.textContent = format(to); return; }
+  const start = performance.now();
+  const tick = (now) => {
+    const t = Math.min(1, (now - start) / ms);
+    const eased = 1 - Math.pow(1 - t, 3);                  // fast at first, then slows down
+    el.textContent = format(Math.round(to * eased));
+    if (t < 1) requestAnimationFrame(tick);
+  };
+  el.textContent = format(0);
+  requestAnimationFrame(tick);
+  setTimeout(() => { el.textContent = format(to); }, ms + 200);   // always ends on the exact number
 }
 async function animateOut(overlay, card, toY) {
   const d = reduceMotion() ? 100 : 220;
@@ -248,7 +269,11 @@ export function sheet(build, { accent = null } = {}) {
   overlay.appendChild(card);
   overlay.addEventListener("click", (e) => { if (e.target === overlay) close(null); });
   document.body.appendChild(overlay);
-  animateIn(overlay, card, "16px");
+  if (reduceMotion()) animateIn(overlay, card, "16px");
+  else {     // the sheet springs up from the bottom edge
+    overlay.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 220, easing: "ease-out" });
+    card.animate([{ transform: "translateY(100%)" }, { transform: "translateY(-6px)", offset: .72 }, { transform: "none" }], { duration: 360, easing: "ease-out" });
+  }
   return { close, done, el: card };
 }
 
@@ -269,7 +294,9 @@ export function toast(text, ms = 2500) {
   const t = px("div", "toast", [text], { role: "status" });
   document.body.appendChild(t);
   const rm = reduceMotion();
-  t.animate([{ opacity: 0, transform: "translate(-50%, 12px)" }, { opacity: 1, transform: "translate(-50%, 0)" }], { duration: rm ? 100 : 220, easing: "ease-out" });
+  t.animate(rm ? [{ opacity: 0 }, { opacity: 1 }]
+    : [{ opacity: 0, transform: "translate(-50%, 16px) scale(.8)" }, { opacity: 1, transform: "translate(-50%, -4px) scale(1.06)", offset: .65 }, { opacity: 1, transform: "translate(-50%, 0) scale(1)" }],
+    { duration: rm ? 100 : 360, easing: "ease-out" });
   setTimeout(() => t.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 200, fill: "forwards" }).finished.then(() => t.remove()), ms);
 }
 
@@ -327,15 +354,23 @@ export function moneyInput(f) {
 export function chipChoice(options, value, { onChange, cls = (v) => "", haptics = false } = {}) {
   let current = value;
   const wrap = h("div", { class: "chips", role: "radiogroup" });
-  const draw = () => {
+  const draw = (popped = false) => {
     wrap.replaceChildren(...options.map(([v, label]) => {
       const on = v === current;
       return px("button", `chip press ${on ? "on" : ""} ${cls(v, on)}`, [label],
-        { type: "button", role: "radio", "aria-checked": String(on), onclick: () => { current = v; if (haptics) haptic("tick"); draw(); onChange?.(v); } });
+        { type: "button", role: "radio", "aria-checked": String(on), onclick: () => { current = v; if (haptics) haptic("tick"); draw(true); onChange?.(v); } });
     }));
+    if (popped) popChip(wrap.querySelector(".chip.on"));
   };
   draw();
   return { el: wrap, get: () => current, set: (v) => { current = v; draw(); } };
+}
+
+// A picked chip pops: squash, overshoot, settle.
+export function popChip(el) {
+  if (!el || reduceMotion()) return;
+  el.animate([{ transform: "scale(.82)" }, { transform: "scale(1.14)", offset: .55 }, { transform: "scale(.97)", offset: .8 }, { transform: "none" }],
+    { duration: 340, easing: "ease-out" });
 }
 
 export function statusChip(status) {
@@ -345,11 +380,16 @@ export function priorityChip(p) {
   return px("span", `chip flat prio ${p === "high" ? "priority-high" : ""}`, [p]);
 }
 
+// The big icon on empty / error cards: the icon on a stepped pixel box in the screen's accent.
+export function bigIcon(name) {
+  return h("div", { class: "big-icon" }, px("div", "ic-box big", [icon(name, "lg")]));
+}
+
 // A "first load failed" card (Section 20): offline or something went wrong.
 export function errorCard(err, retry) {
   const offline = err?.offline;
   return px("div", "card state-card", [
-    h("div", { class: "big-icon" }, icon(offline ? "wifi" : "alert", "xl")),
+    bigIcon(offline ? "wifi" : "alert"),
     h("h3", { class: "f-head" }, offline ? "You’re offline" : "Something went wrong"),
     h("p", {}, offline ? "RoomFund needs internet to load your list. Check your data or Wi-Fi, then try again."
                        : "That’s on us, not you. Try again in a moment."),

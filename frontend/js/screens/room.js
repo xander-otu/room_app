@@ -3,7 +3,7 @@
 // ChatGPT with our prompt, paste its RoomFund code, preview,
 // import. Design PDF Sections 14, 15, 17, 18, 20.
 // ---------------------------------------------------------
-import { h, px, button, iconButton, field, moneyInput, banner, modal, sheet, confirmBox, toast, api, store, haptic, naira, money,
+import { h, px, bigIcon, button, iconButton, field, moneyInput, banner, modal, sheet, confirmBox, toast, api, store, haptic, naira, money,
          errorCard, skeleton } from "../lib.js";
 import { icon } from "../icons.js";
 import { go } from "../app.js";
@@ -94,7 +94,7 @@ export function roomScreen(ctx) {
   const empty = () => {
     ctx.ui.setSub?.("Plan it with ChatGPT");
     body.replaceChildren(px("div", "card state-card", [
-      h("div", { class: "big-icon" }, icon("room", "xl")),
+      bigIcon("room"),
       h("h3", { class: "f-head" }, "Plan your room with ChatGPT"),
       h("p", {}, "Copy our prompt, describe or doodle your room in ChatGPT, then bring its list back here."),
       button("Get started", () => paste(), "primary"),
@@ -103,7 +103,7 @@ export function roomScreen(ctx) {
 
   // ---------- Paste code ----------
   const paste = (problem = null) => {
-    ctx.ui.setSub?.("Bring your room in");
+    ctx.ui.setSub?.("Import from ChatGPT");
     const copyBtn = button("Copy prompt", null, "primary");
     copyBtn.addEventListener("click", async () => {
       try {
@@ -179,8 +179,8 @@ export function roomScreen(ctx) {
     const draw = () => {
       list.replaceChildren(...rows.map((r) => {
         const rowEl = px("div", `check-row ${r.on ? "" : "off"}`, [
-          h("button", { type: "button", class: `cbox press ${r.on ? "on" : ""}`, role: "checkbox", "aria-checked": String(r.on), "aria-label": `Add ${r.name}`,
-            onclick: () => { r.on = !r.on; draw(); } }, r.on ? icon("tick", "sm") : null),
+          px("button", `cbox press ${r.on ? "on" : ""}`, [r.on ? icon("tick", "sm") : null], { type: "button", role: "checkbox", "aria-checked": String(r.on), "aria-label": `Add ${r.name}`,
+            onclick: () => { r.on = !r.on; draw(); } }),
           h("div", { class: "grow" },
             h("div", { class: "nm" }, r.name),
             h("div", { class: "meta" }, h("button", { type: "button", class: "link press", style: { color: "inherit" }, onclick: () => editPrice(r) }, money(r.price)),
@@ -222,9 +222,10 @@ export function roomScreen(ctx) {
 
   // ---------- Imported ----------
   const imported = () => {
-    ctx.ui.setSub?.("Your room");
+    ctx.ui.setSub?.("From ChatGPT");
     const items = (store.items || []).filter((i) => i.room_id === room.room.id);
-    const menuBtn = iconButton("dots", () => openMenu(), "Room menu");
+    const menuBtn = iconButton("dots", () => openMenu(), "Room menu", "round");
+    const boughtCount = items.filter((i) => i.status === "bought").length;
     const openMenu = () => {
       const s = sheet((close) => [
         h("h2", {}, room.room.name),
@@ -243,11 +244,13 @@ export function roomScreen(ctx) {
     const shown = items.slice(0, 3);
     body.replaceChildren(
       h("div", { style: { display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "12px" } },
-        h("div", {}, h("h2", { class: "f-head", style: { margin: "0 0 2px", fontSize: "22px" } }, room.room.name),
-          h("div", { class: "pixel-text sm muted" }, sizeText(room.room))), menuBtn),
+        h("div", {}, h("h2", { class: "room-title" }, room.room.name),
+          h("div", { class: "pixel-text sm muted" }, `${sizeText(room.room)} · ${items.length} ${items.length === 1 ? "item" : "items"}`)), menuBtn),
       h("div", { style: { height: "12px" } }),
-      roomBar(room.progress, "Room done"),
-      px("div", "card floor-ph", [h("div", { class: "grid" }), h("span", { class: "lbl" }, "Floor plan coming soon")]),
+      roomBar(room.progress, "Room done", [`${boughtCount} of ${items.length} bought · `, money(room.progress.bought_value), " of ", money(room.progress.total_value)]),
+      px("div", "card floor-ph", [h("div", { class: "grid" }),
+        ...[[6, 8, 26, 34], [62, 10, 22, 18], [36, 46, 18, 22], [66, 62, 26, 18]].map(([l, t, w, ht]) => h("span", { class: "fb", style: { left: `${l}%`, top: `${t}%`, width: `${w}%`, height: `${ht}%` } })),
+        px("span", "lbl st1", ["Floor plan coming soon"])]),
       h("div", { class: "section-title" }, "In this room"),
       items.length ? h("div", {}, ...shown.map((it) => itemCard(it))) : h("p", { class: "list-note" }, "No items from this room yet."),
       items.length > 3 ? h("button", { type: "button", class: "link press list-note", style: { display: "block", margin: "0 auto 16px" }, onclick: (e) => {

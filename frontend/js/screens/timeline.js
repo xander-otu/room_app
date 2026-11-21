@@ -1,7 +1,7 @@
 // ---------------------------------------------------------
 // timeline.js: 06 Timeline. Design PDF Sections 11, 17, 20.
 // ---------------------------------------------------------
-import { h, px, button, iconButton, api, store, naira, money, errorCard, skeleton, fmtMonthYear } from "../lib.js";
+import { h, px, bigIcon, button, iconButton, api, store, naira, money, errorCard, skeleton, fmtMonthYear } from "../lib.js";
 import { icon } from "../icons.js";
 import { go } from "../app.js";
 import { nextItemBar } from "./progress.js";
@@ -38,7 +38,7 @@ export function timelineScreen(ctx) {
         moneyCard(settings, schedule),
         h("div", { style: { height: "16px" } }),
         px("div", "card state-card", [
-          h("div", { class: "big-icon", style: { color: "#6CC6FF" } }, icon("calendar", "xl")),
+          bigIcon("calendar"),
           h("h3", { class: "f-head" }, "Your plan shows up here"),
           h("p", {}, "Add items and your savings to see when you can afford each thing."),
           button("Add an item", () => go("/items/new"), "primary"),
@@ -50,7 +50,7 @@ export function timelineScreen(ctx) {
     const now = plan.filter((s) => s.Month === 0);
     const later = plan.filter((s) => s.Month !== 0);
     const stops = [];
-    stops.push(h("div", { class: "stop now" }, h("span", { class: "pdot" }), px("div", "card", [
+    stops.push(h("div", { class: "stop now" }, px("span", "pdot", []), px("div", "card", [
       h("div", { class: "top" }, px("span", "chip flat", ["NOW"]), h("span", { class: "when" }, "Today")),
       now.length
         ? h("div", {}, h("p", { class: "pixel-text" }, money(settings.saved_so_far), " saved. You can buy these now:"),
@@ -68,7 +68,7 @@ export function timelineScreen(ctx) {
         ], { role: "button", tabindex: "0" });
         c.classList.add("press");
         c.addEventListener("click", () => go(`/items/${s.item_id}`));
-        stops.push(h("div", { class: "stop never" }, h("span", { class: "pdot" }), c));
+        stops.push(h("div", { class: "stop never" }, px("span", "pdot", []), c));
         continue;
       }
       const rose = s.Price !== s["Original Price"];
@@ -80,7 +80,7 @@ export function timelineScreen(ctx) {
         h("div", { class: "small spent" }, "Total spent by then: ", money(s["Running Total"])),
       ], { role: "button", tabindex: "0" });
       c.addEventListener("click", () => go(`/items/${s.item_id}`));
-      stops.push(h("div", { class: "stop" }, h("span", { class: "pdot" }), c));
+      stops.push(h("div", { class: "stop" }, px("span", "pdot", []), c));
     }
 
     body.replaceChildren(

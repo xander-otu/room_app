@@ -2,7 +2,7 @@
 // items.js: the Items screen (home) and Search.
 // Design PDF Sections 7B, 13, 17, 18, 20.
 // ---------------------------------------------------------
-import { h, px, button, iconButton, naira, money, api, store, prefs, statusChip, priorityChip, errorCard, skeleton } from "../lib.js";
+import { h, px, bigIcon, button, iconButton, naira, money, api, store, prefs, statusChip, priorityChip, errorCard, skeleton, countUp, popChip } from "../lib.js";
 import { icon } from "../icons.js";
 import { go, back } from "../app.js";
 import { stampItemCard } from "../fx.js";
@@ -52,7 +52,7 @@ export function itemCard(item, { q = "", density = store.settings?.list_density 
   const card = px("button", `item-card press ${bought ? "bought" : ""} ${density === "moderate" ? "no-thumb" : ""}`, children,
     { type: "button", onclick: onclick || (() => go(`/items/${item.id}`)), "aria-label": `${item.name}, ${naira(item.price)}, ${item.status}` });
   card.style.textAlign = "left";
-  if (bought) card.appendChild(h("span", { class: "tick-stamp", "aria-hidden": "true" }, icon("tick", "sm")));
+  if (bought) card.appendChild(px("span", "tick-stamp", [icon("tick", "sm")], { "aria-hidden": "true" }));
   return card;
 }
 
@@ -82,7 +82,7 @@ export function itemsScreen(ctx) {
     if (!items.length) {           // Items – empty (Section 18): what new users see after sign up
       body.replaceChildren(balanceBar(settings, schedule),
         px("div", "card state-card", [
-          h("div", { class: "big-icon" }, icon("list", "xl")),
+          bigIcon("list"),
           h("h3", { class: "f-head" }, "Nothing on your list yet"),
           h("p", {}, "Add the first thing your room needs. RoomFund will tell you when you can afford it."),
           button("+ Add your first item", () => go("/items/new"), "primary"),
@@ -91,7 +91,7 @@ export function itemsScreen(ctx) {
     }
     const chips = h("div", { class: "chips filter-chips" }, ...[["all", "All"], ["wanted", "Wanted"], ["bought", "Bought"]].map(([k, label]) =>
       px("button", `chip press ${filter === k ? "on" : ""}`, [`${label} · ${counts[k]}`], { type: "button", "aria-pressed": String(filter === k),
-        onclick: () => { filter = k; draw(items, settings, schedule); } })));
+        onclick: () => { filter = k; draw(items, settings, schedule); popChip(body.querySelector(".filter-chips .chip.on")); } })));
     const list = h("div", {}, shown.map((it) => itemCard(it)));
     if (!shown.length) list.appendChild(h("p", { class: "list-note" }, "Nothing here yet."));
     body.replaceChildren(balanceBar(settings, schedule), chips, list);
@@ -109,6 +109,7 @@ export function itemsScreen(ctx) {
     try {
       const [items, settings, schedule] = await Promise.all([store.loadItems(true), store.loadSettings(true), store.loadSchedule(true).catch(() => null)]);
       draw(items, settings, schedule);
+      countUp(body.querySelector(".balance .amt"), settings.saved_so_far);   // the balance rolls up like a score
     } catch (e) {
       const bb = balanceBar(store.settings, store.schedule);
       bb.classList.add("dim");
@@ -118,8 +119,8 @@ export function itemsScreen(ctx) {
   load();
 
   const quick = h("div", { class: "quick" },
-    iconButton("search", () => go("/search"), "Search your items"),
-    iconButton("plus", () => go("/items/new"), "Add item", "accent"));
+    iconButton("search", () => go("/search"), "Search your items", "round"),
+    iconButton("plus", () => go("/items/new"), "Add item", "accent round"));
   return {
     accent: "items", tab: "items",
     header: { wordmark: true, title: "My items", sub: "" },
@@ -162,9 +163,9 @@ export function searchScreen(ctx) {
     timer = setTimeout(() => remember(q), 1200);
     if (!found.length) {
       body.replaceChildren(
-        h("p", { class: "section-title", style: { fontSize: "16px" } }, `No items called “${q}”`),
+        h("p", { class: "search-head" }, `No items called “${q}”`),
         px("div", "card state-card", [
-          h("div", { class: "big-icon" }, icon("search", "xl")),
+          bigIcon("search"),
           h("h3", { class: "f-head" }, "Not on your list yet"),
           h("p", {}, `Need a ${q}? Add it and RoomFund will plan when you can afford it.`),
           button(`+ Add "${q}"`, () => go(`/items/new?name=${encodeURIComponent(q)}`), "primary"),
@@ -172,7 +173,7 @@ export function searchScreen(ctx) {
       return;
     }
     body.replaceChildren(
-      h("p", { class: "section-title", style: { fontSize: "16px" } }, `${found.length} ${found.length === 1 ? "item matches" : "items match"} “${q}”`),
+      h("p", { class: "search-head" }, `${found.length} ${found.length === 1 ? "item matches" : "items match"} “${q}”`),
       ...found.map((it) => itemCard(it, { q, onclick: () => { remember(q); go(`/items/${it.id}`); } })));
   };
   input.addEventListener("input", run);

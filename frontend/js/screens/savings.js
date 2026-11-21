@@ -1,7 +1,7 @@
 // ---------------------------------------------------------
 // savings.js: 07 Savings. Design PDF Sections 12, 17, 18, 20.
 // ---------------------------------------------------------
-import { h, px, button, field, moneyInput, banner, modal, confirmBox, api, store, haptic, naira, money, errorCard, skeleton,
+import { h, px, bigIcon, button, field, moneyInput, banner, modal, confirmBox, api, store, haptic, naira, money, errorCard, skeleton, countUp,
          iso, today, fmtDay, weekStart, addDays, parseDate } from "../lib.js";
 import { icon } from "../icons.js";
 import { showBadges } from "../fx.js";
@@ -18,6 +18,7 @@ export function savingsScreen(ctx) {
       streak = progress.streak_weeks;
       ctx.ui.setSub?.(streak ? `🔥 ${streak} ${streak === 1 ? "week" : "weeks"} in a row` : "No streak yet");
       draw(logs, settings, schedule);
+      countUp(body.querySelector(".balance .amt"), settings.saved_so_far);
     } catch (e) { body.replaceChildren(errorCard(e, load)); }
   };
 
@@ -29,11 +30,11 @@ export function savingsScreen(ctx) {
     for (let i = 7; i >= 0; i--) {
       const wk = iso(addDays(thisWeek, -7 * i));
       const on = weeks.has(wk);
-      boxes.push(h("span", { class: `wk ${on ? "on" : ""}`, title: `Week of ${fmtDay(wk)}` }, on ? icon("tick", "sm") : null));
+      boxes.push(px("span", `wk st1 ${on ? "on" : ""}`, [on ? icon("tick", "sm") : null], { title: `Week of ${fmtDay(wk)}` }));
     }
     const c = px("div", "card streak-card", [
       h("div", { style: { display: "flex", gap: "12px", alignItems: "center" } },
-        h("div", { class: "octagon big" }, icon("flame", "lg")),
+        px("div", "ic-box yellow", [icon("flame", "lg")]),
         h("div", {}, h("div", { class: "big" }, streak ? `${streak} ${streak === 1 ? "week" : "weeks"} in a row` : "No streak yet"),
           h("div", { class: "pixel-text sm muted" }, "Save something every week to keep it going."))),
       h("div", { class: "weeks", "aria-label": "Last 8 weeks" }, ...boxes),
@@ -54,14 +55,14 @@ export function savingsScreen(ctx) {
     const parts = [streakCard(logs), savedBar(settings, schedule), h("div", { style: { height: "16px" } }), addButton()];
     if (!logs.length) {
       parts.push(h("div", { style: { height: "16px" } }), px("div", "card state-card", [
-        h("div", { class: "big-icon" }, icon("coin", "xl")),
+        bigIcon("coin"),
         h("h3", { class: "f-head" }, "No savings logged yet"),
         h("p", { style: { margin: 0 } }, "Even ", money(1000), " counts. Start your streak!"),
       ]));
     } else {
       parts.push(h("div", { class: "section-title" }, "History"),
         ...logs.map((l) => px("div", "saving-row", [
-          h("div", { class: "coin" }, icon("target")),
+          px("div", "coin st1", [icon("target")]),
           h("div", { style: { flex: 1 } }, h("div", { class: "amt" }, `+${naira(l.amount)}`),
             h("div", { class: "meta" }, `${fmtDay(l.saved_on)} · ${l.source === "payday" ? "Payday ✓" : "Saved"}`)),
           h("button", { class: "mini-btn press", type: "button", "aria-label": "Delete this entry", onclick: async () => {

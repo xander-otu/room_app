@@ -46,10 +46,10 @@ export function detailScreen(ctx) {
     if (bought) inner.push(h("div", { class: "stamp-big", "aria-label": "Bought" }, icon("tick", "lg"), "BOUGHT"));
     const box = px("div", "hero", inner);
     box.firstChild.style.setProperty("--fill", "var(--accent-soft)");
-    if (!bought && !item.photo_url) box.firstChild.style.setProperty("--fill", "var(--sky-soft)");
+    if (!item.photo_url) box.firstChild.style.setProperty("--fill", "var(--sky-soft)");   // no photo: the sky-blue area (bought or not)
     box.appendChild(h("div", { class: "add-photo" }, px("button", "btn small auto press", [icon("camera", "sm"), item.photo_url ? "Change photo" : "Add photo"], { type: "button", onclick: changePhoto })));
     if (!bought && !item.photo_url) box.firstChild.addEventListener("click", changePhoto);
-    if (bought) box.appendChild(h("span", { class: "tick-stamp" }, icon("tick", "sm")));
+    if (bought) box.appendChild(px("span", "tick-stamp big", [icon("tick", "lg")]));
     return box;
   }
   async function changePhoto(e) {
@@ -80,7 +80,7 @@ export function detailScreen(ctx) {
       return px("div", "card green", [
         px("div", "verdict-badge bought", ["BOUGHT"]),
         h("p", { class: "pixel-text" }, "You bought this for ", money(item.bought_price ?? item.price), `${when}. Nice one!`),
-        h("p", { class: "pixel-text sm muted", style: { marginTop: "8px" } }, "It's off your timeline now, so your money goes to the next thing."),
+        h("p", { class: "pixel-text sm muted", style: { marginTop: "8px" } }, "It's off your timeline now. One step closer to your room."),
       ]);
     }
     const v = report.verdict;
@@ -104,14 +104,14 @@ export function detailScreen(ctx) {
     if (!stop) return null;
     if (stop.Month === "never") {
       return px("div", "card red tl-card", [
-        h("div", { class: "ic", style: { background: "var(--wanted)" } }, icon("alert")),
+        px("div", "ic-box red", [icon("alert")]),
         h("div", {}, h("div", { class: "f-head" }, "You can't catch this one yet"),
           h("div", { class: "pixel-text sm" }, "This price rises faster than you save. Buy it earlier (raise its priority), save more each month, or pick a cheaper one.")),
       ]);
     }
     const n = stop.Month;
     const card = px("div", "card tl-card", [
-      h("div", { class: "ic" }, icon("calendar")),
+      px("div", "ic-box sky", [icon("calendar")]),
       h("div", {},
         h("div", { class: "f-head" }, n === 0 ? "You can afford this now" : ["You can afford this in ", h("strong", {}, `Month ${n}`)]),
         h("div", { class: "pixel-text sm muted" }, n === 0 ? "From your Timeline" : `About ${fmtMonthLong(monthDate(n, schedule))} · from your Timeline`)),
